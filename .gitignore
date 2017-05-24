@@ -1,4 +1,8 @@
 # Byte-compiled / optimized / DLL files
+checkpoint
+*.pth.tar
+data/mpii/images
+
 __pycache__/
 *.py[cod]
 *$py.class
