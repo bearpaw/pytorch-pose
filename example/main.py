@@ -13,6 +13,8 @@ import torchvision.datasets as datasets
 from pose import *
 from pose.utils.evaluation import *
 from pose.utils.misc import *
+from pose.utils.osutils import *
+from pose.utils.imutils import batch_with_heatmap
 # from pose.utils.logger import Logger
 # import models
 # import datasets
@@ -39,12 +41,12 @@ def main(args):
         model = models.__dict__[args.arch](pretrained=True)
     else:
         print("=> creating model '{}'".format(args.arch))
-        model = models.__dict__[args.arch]()
+        model = models.__dict__[args.arch](num_classes=16)
 
     model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = torch.nn.MSELoss().cuda()
+    criterion = torch.nn.MSELoss(size_average=False).cuda()
 
     optimizer = torch.optim.RMSprop(model.parameters(), 
                                 lr=args.lr,
@@ -74,17 +76,17 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations_hg.json', 'data/mpii/images'),
+        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images'),
         batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations_hg.json', 'data/mpii/images', train=False),
+        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', train=False),
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        validate(val_loader, model, criterion)
+        validate(val_loader, model, criterion, args.debug)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -92,10 +94,10 @@ def main(args):
         print('\nEpoch: %d | LR: %.8f' % (epoch, lr)) 
 
         # train for one epoch
-        train_loss = train(train_loader, model, criterion, optimizer, epoch)
+        train_loss = train(train_loader, model, criterion, optimizer, epoch, args.debug)
 
         # evaluate on validation set
-        valid_loss = validate(val_loader, model, criterion)
+        valid_loss = validate(val_loader, model, criterion, args.debug)
 
         # append logger file
         logger.append([train_loss, valid_loss])
@@ -115,7 +117,7 @@ def main(args):
     logger.plot()
     savefig(os.path.join(args.checkpoint, 'log.eps'))
 
-def train(train_loader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch, debug=False):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -126,6 +128,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
     end = time.time()
 
+    gt_win, pred_win = None, None
     bar = Bar('Processing', max=len(train_loader))
     for i, (input, target) in enumerate(train_loader):
         # measure data loading time
@@ -137,10 +140,35 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         # compute output
         output = model(input_var)
+        # print('\ntarget | min: %f, max: %f' % (target[0][0].min(), target[0][0].max()))
+        # print('Output | min: %f, max: %f' % (output.data[0][0].min(), output.data[0][0].max()))
         loss = 0
-        for o in output:
-            loss += criterion(o, target_var)
-        acc = accuracy(output[-1].data, target_var.data, idx)
+        if type(output) == list:
+            for o in output:
+                loss += criterion(o, target_var)
+            acc = accuracy(output[-1].data, target_var.data, idx)
+        else:
+            loss = criterion(output, target_var)
+            acc = accuracy(output.data, target_var.data, idx)
+
+        if debug:
+            # https://stackoverflow.com/questions/17888593/display-sequence-of-images-using-matplotlib
+            if type(output) == list:
+                out = output[-1].data
+            else:
+                out = output.data
+            gt_batch_img = batch_with_heatmap(input, target)
+            pred_batch_img = batch_with_heatmap(input, out)
+            if not gt_win or not pred_win:
+                plt.subplot(121)
+                gt_win = plt.imshow(gt_batch_img)
+                plt.subplot(122)
+                pred_win = plt.imshow(pred_batch_img)
+            else:
+                gt_win.set_data(gt_batch_img)
+                pred_win.set_data(pred_batch_img)
+            plt.pause(.05)
+            plt.draw()
 
         # measure accuracy and record loss
         acces.update(acc[0], input.size(0))
@@ -163,8 +191,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
-                    loss=loss.data[0],
-                    acc = acc[0]
+                    loss=losses.avg,
+                    acc=acces.avg
                     )
         bar.next()
     bar.finish()
@@ -172,7 +200,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     return losses.avg
 
 
-def validate(val_loader, model, criterion):
+def validate(val_loader, model, criterion, debug=False):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acces = AverageMeter()
@@ -181,6 +209,7 @@ def validate(val_loader, model, criterion):
     # switch to evaluate mode
     model.eval()
 
+    gt_win, pred_win = None, None
     end = time.time()
     bar = Bar('Processing', max=len(val_loader))
     for i, (input, target) in enumerate(val_loader):
@@ -191,9 +220,33 @@ def validate(val_loader, model, criterion):
         # compute output
         output = model(input_var)
         loss = 0
-        for o in output:
-            loss += criterion(o, target_var)
-        acc = accuracy(output[-1].data, target_var.data, idx)
+        if type(output) == list:
+            for o in output:
+                loss += criterion(o, target_var)
+            acc = accuracy(output[-1].data, target_var.data, idx)
+        else:
+            loss = criterion(output, target_var)
+            acc = accuracy(output.data, target_var.data, idx)
+
+        if debug:
+            # print('%f %f' % (input.min(), input.max()))
+            # https://stackoverflow.com/questions/17888593/display-sequence-of-images-using-matplotlib
+            if type(output) == list:
+                out = output[-1].data
+            else:
+                out = output.data
+            gt_batch_img = batch_with_heatmap(input, target)
+            pred_batch_img = batch_with_heatmap(input, out)
+            if not gt_win or not pred_win:
+                plt.subplot(121)
+                gt_win = plt.imshow(gt_batch_img)
+                plt.subplot(122)
+                pred_win = plt.imshow(pred_batch_img)
+            else:
+                gt_win.set_data(gt_batch_img)
+                pred_win.set_data(pred_batch_img)
+            plt.pause(.05)
+            plt.draw()
 
         # measure accuracy and record loss
         # prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
@@ -222,8 +275,10 @@ def validate(val_loader, model, criterion):
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
-                    loss=loss.data[0],
-                    acc = acc[0]
+                    loss=losses.avg,
+                    acc=acces.avg
+                    # loss=loss.data[0],
+                    # acc = acc[0]
                     )
                        # epoch, i, len(train_loader), batch_time.avg,
                        # data_time.avg, losses.avg)
@@ -293,6 +348,8 @@ if __name__ == '__main__':
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
+    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
+                        help='show intermediate results')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                         help='use pre-trained model')
     main(parser.parse_args())

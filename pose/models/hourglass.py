@@ -8,10 +8,10 @@ import torch.nn.functional as F
 import math
 # from .preresnet import BasicBlock, Bottleneck
 
-__all__ = ['HourglassNet', 'hg2', 'hg4', 'hg8']
+__all__ = ['HourglassNet', 'hg1', 'hg2', 'hg4', 'hg8']
 
 class Bottleneck(nn.Module):
-    expansion = 4
+    expansion = 2
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
@@ -21,7 +21,7 @@ class Bottleneck(nn.Module):
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
                                padding=1, bias=False)
         self.bn3 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
+        self.conv3 = nn.Conv2d(planes, planes * 2, kernel_size=1, bias=False)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -130,14 +130,14 @@ class HourglassNet(nn.Module):
         self.fc_ = nn.ModuleList(fc)
         self.score_ = nn.ModuleList(score_)
 
-        # initialization
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+        # # initialization
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        #         m.weight.data.normal_(0, math.sqrt(2. / n))
+        #     elif isinstance(m, nn.BatchNorm2d):
+        #         m.weight.data.fill_(1)
+        #         m.bias.data.zero_()
 
     def _make_residual(self, block, planes, blocks, stride=1):
         downsample = None
@@ -190,14 +190,18 @@ class HourglassNet(nn.Module):
 
         return out
 
-def hg2():
-    model = HourglassNet(Bottleneck, [1, 1, 1], num_stacks=2, num_blocks=4)
+def hg1(**kwargs):
+    model = HourglassNet(Bottleneck, [1, 1, 1], num_stacks=1, num_blocks=8, **kwargs)
     return model
 
-def hg4():
-    model = HourglassNet(Bottleneck, [1, 1, 1], num_stacks=4, num_blocks=2)
+def hg2(**kwargs):
+    model = HourglassNet(Bottleneck, [1, 1, 1], num_stacks=2, num_blocks=4, **kwargs)
     return model
 
-def hg8():
-    model = HourglassNet(Bottleneck, [1, 1, 1], num_stacks=8, num_blocks=1)
+def hg4(**kwargs):
+    model = HourglassNet(Bottleneck, [1, 1, 1], num_stacks=4, num_blocks=2, **kwargs)
+    return model
+
+def hg8(**kwargs):
+    model = HourglassNet(Bottleneck, [1, 1, 1], num_stacks=8, num_blocks=1, **kwargs)
     return model

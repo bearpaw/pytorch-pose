@@ -62,8 +62,6 @@ class Mpii(data.Dataset):
                 'std': std,
                 }
             torch.save(meanstd, meanstd_file)
-        # self.mean = meanstd['mean']
-        # self.std = meanstd['std']
         print('   Mean: %.2f, %.2f, %.2f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
         print('   Std:  %.2f, %.2f, %.2f\n' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
         return meanstd['mean'], meanstd['std']
@@ -90,7 +88,6 @@ class Mpii(data.Dataset):
         # For single-person pose estimation with a centered/scaled figure
         nparts = pts.size(0)
         img = load_image(img_path) # CxHxW
-        img = color_normalize(img, self.mean, self.std)
 
         r = 0
         if self.is_train == True:
@@ -108,30 +105,28 @@ class Mpii(data.Dataset):
                 pts = shufflelr(pts, width=img.size(2), dataset='mpii')
                 c[0] = img.size(2) - c[0]
 
+
         # Prepare image and groundtruth map
-        inp = crop(img, c, s, r, self.inp_res)
+        # print('%f %f' % (img.min(), img.max()))
+        inp = crop(img, c, s, [self.inp_res, self.inp_res], rot=r)
+        inp = color_normalize(inp, self.mean, self.std)
+        # print('%f %f' % (inp.min(), inp.max()))
 
         # Generate ground truth
         tpts = pts.clone()
         for i in range(nparts):
             if tpts[i, 2] > 0:
-                tpts[i, 0:2] = transform(tpts[i, 0:2], c, s, r, self.out_res)
+                # tpts[i, 0:2] = transform(tpts[i, 0:2], c, s, r, self.out_res)
+                tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2], c, s, [self.out_res, self.out_res], rot=r))
 
         target = torch.zeros(nparts, self.out_res, self.out_res)
         for i in range(nparts):
             if tpts[i, 2] > 0:
-                vinp = downsample(inp, 4)
                 target[i] = draw_gaussian(target[i], tpts[i], 2)
-                # print('Max %f min %f' % (target[i].max(), target[i].min()))
-                # plt.imshow(to_numpy(target[i]))
-                # plt.show()
-                # vinp  = (vinp*0.5 + target[i].expand(3, 64, 64)*0.5)
-                # imshow(target[i].expand(3, 64, 64))
-                # plt.show()
 
+        # fig2 = plt.figure()
         # show_joints(inp, tpts*4)
         # plt.show()
-
         return inp, target
 
     def __len__(self):
