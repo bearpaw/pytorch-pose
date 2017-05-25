@@ -1,27 +1,27 @@
+# from pose.utils import evaluation
+from pose import *
 import torch
-from models import create_model
 
-# import models
+sigma = 1
+n = 1
+c = 16
 
-# # create_model()
+idx = [1,2,3,4,5,6,11,12,15,16]
 
-# model_names = sorted(name for name in models.__dict__
-#     if name.islower() and not name.startswith("__")
-#     and callable(models.__dict__[name]))
+scores = torch.zeros([n, c, 64, 64])
+target = torch.zeros([n, c, 64, 64])
 
-# model = models.__dict__['create_model']()
+for i in range(n):
+    for j in range(c):        
+        pt = np.zeros(2, dtype='int')
+        pt[0] = randint(0, 63)
+        pt[1] = randint(0, 63)
+        # print(pt)
+        scores[i, j, :, :] = draw_gaussian2(to_torch(scores[i, j, :, :]), pt, sigma)
+        gt = np.zeros(2, dtype='int')
+        gt[0] = pt[0] + randint(0,2)
+        gt[1] = pt[1] + randint(0,4)
+        target[i, j, :, :] = draw_gaussian2(to_torch(target[i, j, :, :]), gt, sigma)
 
-# model.cuda()
-
-# crit = torch.nn.MSELoss()
-
-# inp = torch.autograd.Variable(torch.Tensor(6, 3, 256, 256)).cuda()
-
-# out = model(inp)
-
-# loss = 0
-# for o in out:
-#    loss += crit(o, o)
-
-
-# print loss
+acc = accuracy(scores, target, idx)
+print(acc)

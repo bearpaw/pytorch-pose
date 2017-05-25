@@ -2,6 +2,8 @@
 checkpoint
 *.pth.tar
 data/mpii/images
+*.json
+*debug*
 
 __pycache__/
 *.py[cod]
