@@ -1,0 +1,3 @@
+[submodule "pose/progress"]
+	path = pose/progress
+	url = https://github.com/verigak/progress.git
