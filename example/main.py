@@ -9,16 +9,16 @@ import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+import matplotlib.pyplot as plt
 
-from pose import *
-from pose.utils.evaluation import *
-from pose.utils.misc import *
-from pose.utils.osutils import *
+import pose.models as models
+import pose.datasets as datasets
+from pose import Bar
+from pose.utils.logger import Logger
+from pose.utils.evaluation import accuracy, AverageMeter
+from pose.utils.misc import save_checkpoint, adjust_learning_rate
+from pose.utils.osutils import mkdir_p, isfile, isdir, join
 from pose.utils.imutils import batch_with_heatmap
-# from pose.utils.logger import Logger
-# import models
-# import datasets
-# from utils import *
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -26,13 +26,13 @@ model_names = sorted(name for name in models.__dict__
 
 idx = [1,2,3,4,5,6,11,12,15,16]
 
-best_prec1 = 0
+best_acc = 0
 
 def main(args):
-    global best_prec1
+    global best_acc
 
     # create checkpoint dir
-    if not os.path.isdir(args.checkpoint):
+    if not isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
 
     # create model
@@ -56,7 +56,7 @@ def main(args):
     # optionally resume from a checkpoint
     title = 'mpii-' + args.arch
     if args.resume:
-        if os.path.isfile(args.resume):
+        if isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
@@ -65,12 +65,12 @@ def main(args):
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
-            logger = Logger(os.path.join(args.checkpoint, 'log.txt'), title=title, resume=True)
+            logger = Logger(join(args.checkpoint, 'log.txt'), title=title, resume=True)
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
     else:        
-        logger = Logger(os.path.join(args.checkpoint, 'log.txt'), title=title)
-        logger.set_names(['Train Loss', 'Valid Loss'])
+        logger = Logger(join(args.checkpoint, 'log.txt'), title=title)
+        logger.set_names(['Train Loss', 'Val Loss', 'Train Acc', 'Val Acc'])
 
     torch.backends.cudnn.benchmark = True
 
@@ -94,17 +94,17 @@ def main(args):
         print('\nEpoch: %d | LR: %.8f' % (epoch, lr)) 
 
         # train for one epoch
-        train_loss = train(train_loader, model, criterion, optimizer, epoch, args.debug)
+        train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.debug)
 
         # evaluate on validation set
-        valid_loss = validate(val_loader, model, criterion, args.debug)
+        valid_loss, valid_acc = validate(val_loader, model, criterion, args.debug)
 
         # append logger file
         logger.append([train_loss, valid_loss])
 
-        # remember best prec@1 and save checkpoint
-        is_best = True #prec1 > best_prec1
-        best_prec1 = 1 #max(prec1, best_prec1)
+        # remember best acc and save checkpoint
+        is_best = valid_acc > best_acc
+        best_acc = max(valid_acc, best_acc)
         save_checkpoint({
             'epoch': epoch + 1,
             'arch': args.arch,
@@ -140,29 +140,21 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
 
         # compute output
         output = model(input_var)
-        # print('\ntarget | min: %f, max: %f' % (target[0][0].min(), target[0][0].max()))
-        # print('Output | min: %f, max: %f' % (output.data[0][0].min(), output.data[0][0].max()))
-        loss = 0
-        if type(output) == list:
-            for o in output:
-                loss += criterion(o, target_var)
-            acc = accuracy(output[-1].data, target_var.data, idx)
-        else:
-            loss = criterion(output, target_var)
-            acc = accuracy(output.data, target_var.data, idx)
 
-        if debug:
-            # https://stackoverflow.com/questions/17888593/display-sequence-of-images-using-matplotlib
-            if type(output) == list:
-                out = output[-1].data
-            else:
-                out = output.data
+        loss = 0
+        for o in output:
+            loss += criterion(o, target_var)
+        acc = accuracy(output[-1].data, target_var.data, idx)
+
+        if debug: # visualize groundtruth and predictions
             gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, out)
+            pred_batch_img = batch_with_heatmap(input, output[-1].data)
             if not gt_win or not pred_win:
-                plt.subplot(121)
+                ax1 = plt.subplot(121)
+                ax1.title.set_text('Groundtruth')
                 gt_win = plt.imshow(gt_batch_img)
-                plt.subplot(122)
+                ax2 = plt.subplot(122)
+                ax2.title.set_text('Prediction')
                 pred_win = plt.imshow(pred_batch_img)
             else:
                 gt_win.set_data(gt_batch_img)
@@ -195,16 +187,15 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
                     acc=acces.avg
                     )
         bar.next()
-    bar.finish()
 
-    return losses.avg
+    bar.finish()
+    return losses.avg, acces.avg
 
 
 def validate(val_loader, model, criterion, debug=False):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acces = AverageMeter()
-    # top5 = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
@@ -220,23 +211,13 @@ def validate(val_loader, model, criterion, debug=False):
         # compute output
         output = model(input_var)
         loss = 0
-        if type(output) == list:
-            for o in output:
-                loss += criterion(o, target_var)
-            acc = accuracy(output[-1].data, target_var.data, idx)
-        else:
-            loss = criterion(output, target_var)
-            acc = accuracy(output.data, target_var.data, idx)
+        for o in output:
+            loss += criterion(o, target_var)
+        acc = accuracy(output[-1].data, target_var.data, idx)
 
         if debug:
-            # print('%f %f' % (input.min(), input.max()))
-            # https://stackoverflow.com/questions/17888593/display-sequence-of-images-using-matplotlib
-            if type(output) == list:
-                out = output[-1].data
-            else:
-                out = output.data
             gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, out)
+            pred_batch_img = batch_with_heatmap(input, output[-1].data)
             if not gt_win or not pred_win:
                 plt.subplot(121)
                 gt_win = plt.imshow(gt_batch_img)
@@ -249,78 +230,30 @@ def validate(val_loader, model, criterion, debug=False):
             plt.draw()
 
         # measure accuracy and record loss
-        # prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
         losses.update(loss.data[0], input.size(0))
         acces.update(acc[0], input.size(0))
-        # top1.update(prec1[0], input.size(0))
-        # top5.update(prec5[0], input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
-        # if i % args.print_freq == 0:
-        #     print('Test: [{0}/{1}]\t'
-        #           'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-        #           'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-        #           'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-        #           'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-        #            i, len(val_loader), batch_time=batch_time, loss=losses,
-        #            top1=top1, top5=top5))
-
         # plot progress
-        bar.suffix  = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
+        bar.suffix  = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total: }| ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
                     batch=i,
                     size=len(val_loader),
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
                     loss=losses.avg,
-                    acc=acces.avg
-                    # loss=loss.data[0],
-                    # acc = acc[0]
+                    acc=acces.avg,
                     )
-                       # epoch, i, len(train_loader), batch_time.avg,
-                       # data_time.avg, losses.avg)
         bar.next()
 
-        # progress_bar(i, len(val_loader), 'Loss: %.3f ' % losses.avg)
-
-    # print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
-    #       .format(top1=top1, top5=top5))
-
     bar.finish()
-    return losses.avg
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-
-def adjust_learning_rate(optimizer, epoch, lr):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = lr * (0.1 ** (epoch // 30))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-    return lr
+    return losses.avg, acces.avg
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-    # parser.add_argument('data', metavar='DIR',
-    #                     help='path to dataset')
     parser.add_argument('--arch', '-a', metavar='ARCH', default='hg8',
                         choices=model_names,
                         help='model architecture: ' +

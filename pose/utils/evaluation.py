@@ -1,12 +1,12 @@
 from __future__ import absolute_import
 
 import numpy as np
-from random import randint
 import matplotlib.pyplot as plt
+from random import randint
 
 from .misc import *
 
-__all__ = ['accuracy']
+__all__ = ['accuracy', 'AverageMeter']
 
 def get_preds(scores):
     ''' get predictions from score maps in torch Tensor
@@ -64,44 +64,20 @@ def accuracy(output, target, idxs, thr=0.5):
     if cnt != 0:  
         acc[0] = avg_acc / cnt
     return acc
+    
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
 
-# print('eval')
-# sigma = 1
-# n = 1
-# c = 16
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
 
-# idx = [1,2,3,4,5,6,11,12,15,16]
-
-# scores = torch.zeros([n, c, 64, 64])
-# target = torch.zeros([n, c, 64, 64])
-
-# for i in range(n):
-#     for j in range(c):        
-#         pt = np.zeros(2, dtype='int')
-#         pt[0] = randint(0, 63)
-#         pt[1] = randint(0, 63)
-#         # print(pt)
-#         scores[i, j, :, :] = draw_gaussian2(to_torch(scores[i, j, :, :]), pt, sigma)
-#         gt = np.zeros(2, dtype='int')
-#         gt[0] = pt[0] + randint(0,2)
-#         gt[1] = pt[1] + randint(0,4)
-#         target[i, j, :, :] = draw_gaussian2(to_torch(target[i, j, :, :]), gt, sigma)
-
-# acc = accuracy(scores, target, idx)
-# print(acc)
-# preds = get_preds(scores)
-# print(preds)
-
-# plt.imshow(to_numpy(scores[0,0,:,:]))
-# plt.show()
-
-# #######################
-# preds = torch.rand(4, 16, 2)
-# target = torch.rand(4, 16, 2)
-# normalize = torch.ones(preds.size(0))*64/10
-
-# dists = calc_dists(preds, target, normalize)
-# print(dists)
-
-# a = dist_acc(dists)
-# print(a)
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count

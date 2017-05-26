@@ -1,31 +1,26 @@
-import json
-import torch
-import torch.nn as nn
-from   torch.autograd import Variable
-import torchvision.transforms as transforms
+from __future__ import print_function, absolute_import
+
 import os
 import numpy as np
-from   PIL import Image
-import scipy.ndimage as ndi
-import scipy.misc as misc
-import matplotlib.pyplot as plt
-import torch.utils.data as data
+import json
 import random
 import math
 
-from ..utils import *
+import torch
+import torch.utils.data as data
 
-
+from pose.utils.osutils import *
+from pose.utils.imutils import *
+from pose.utils.transforms import *
 
 class Mpii(data.Dataset):
-
-    def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, gsize=2,
+    def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, sigma=1,
         scale_factor=0.25, rot_factor=30):
         self.img_folder = img_folder    # root image folders
         self.is_train = train           # training set or test set
         self.inp_res = inp_res
         self.out_res = out_res
-        self.gsize = gsize
+        self.sigma = sigma
         self.scale_factor = scale_factor
         self.rot_factor = rot_factor
 
@@ -43,7 +38,7 @@ class Mpii(data.Dataset):
 
     def _compute_mean(self):
         meanstd_file = './data/mpii/mean.pth.tar'
-        print('=> Get mean/std...')
+        print('\n=> Get mean/std...')
         if isfile(meanstd_file):
             meanstd = torch.load(meanstd_file)
         else:
@@ -63,7 +58,7 @@ class Mpii(data.Dataset):
                 }
             torch.save(meanstd, meanstd_file)
         print('   Mean: %.2f, %.2f, %.2f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
-        print('   Std:  %.2f, %.2f, %.2f\n' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
+        print('   Std:  %.2f, %.2f, %.2f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
         return meanstd['mean'], meanstd['std']
 
 
@@ -105,28 +100,21 @@ class Mpii(data.Dataset):
                 pts = shufflelr(pts, width=img.size(2), dataset='mpii')
                 c[0] = img.size(2) - c[0]
 
-
         # Prepare image and groundtruth map
-        # print('%f %f' % (img.min(), img.max()))
         inp = crop(img, c, s, [self.inp_res, self.inp_res], rot=r)
         inp = color_normalize(inp, self.mean, self.std)
-        # print('%f %f' % (inp.min(), inp.max()))
 
         # Generate ground truth
         tpts = pts.clone()
         for i in range(nparts):
             if tpts[i, 2] > 0:
-                # tpts[i, 0:2] = transform(tpts[i, 0:2], c, s, r, self.out_res)
                 tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2], c, s, [self.out_res, self.out_res], rot=r))
 
         target = torch.zeros(nparts, self.out_res, self.out_res)
         for i in range(nparts):
             if tpts[i, 2] > 0:
-                target[i] = draw_gaussian(target[i], tpts[i], 2)
+                target[i] = draw_gaussian(target[i], tpts[i], self.sigma)
 
-        # fig2 = plt.figure()
-        # show_joints(inp, tpts*4)
-        # plt.show()
         return inp, target
 
     def __len__(self):
@@ -134,7 +122,3 @@ class Mpii(data.Dataset):
             return len(self.train)
         else:
             return len(self.valid)
-
-
-# mpii = Mpii('../data/mpii/mpii_annotations.json', '../data/mpii/images', train=False)
-# mpii.__getitem__(10)
