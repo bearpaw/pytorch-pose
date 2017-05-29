@@ -11,12 +11,17 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
 - Training/testing results visualization
 
 ## Installation
-Please follow the [installation instruction of PyTorch](http://pytorch.org/). Note that the code is developed with Python2 and has not been tested with Python3 yet. 
+1. Please follow the [installation instruction of PyTorch](http://pytorch.org/). Note that the code is developed with Python2 and has not been tested with Python3 yet. 
 
-Create a symbolic link to the `images` directory of the MPII dataset:
-```
-ln -s PATH_TO_MPII_IMAGES_DIR data/mpii/images
-```
+2. Clone the repository with submodule
+   ```
+   git clone --recursive https://github.com/bearpaw/pytorch-pose.git
+   ```
+
+3. Create a symbolic link to the `images` directory of the MPII dataset:
+   ```
+   ln -s PATH_TO_MPII_IMAGES_DIR data/mpii/images
+   ```
 
 ## Usage
 Run the following command in terminal to train a single stack of hourglass network on the MPII human pose dataset. 
