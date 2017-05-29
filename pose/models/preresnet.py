@@ -119,7 +119,7 @@ class PreResNet(nn.Module):
             downsample = nn.Sequential(
                 nn.Conv2d(self.inplanes, planes * block.expansion,
                           kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion),
+                # nn.BatchNorm2d(planes * block.expansion),
             )
 
         layers = []

@@ -2,23 +2,21 @@ from __future__ import print_function, absolute_import
 
 import argparse
 import time
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn.parallel
 import torch.optim
-import torch.utils.data
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import matplotlib.pyplot as plt
 
-import pose.models as models
-import pose.datasets as datasets
 from pose import Bar
 from pose.utils.logger import Logger
 from pose.utils.evaluation import accuracy, AverageMeter
 from pose.utils.misc import save_checkpoint, adjust_learning_rate
 from pose.utils.osutils import mkdir_p, isfile, isdir, join
 from pose.utils.imutils import batch_with_heatmap
+import pose.models as models
+import pose.datasets as datasets
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -46,7 +44,7 @@ def main(args):
     model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = torch.nn.MSELoss(size_average=False).cuda()
+    criterion = torch.nn.MSELoss(size_average=True).cuda()
 
     optimizer = torch.optim.RMSprop(model.parameters(), 
                                 lr=args.lr,
@@ -60,7 +58,7 @@ def main(args):
             print("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
-            best_prec1 = checkpoint['best_prec1']
+            best_acc = checkpoint['best_acc']
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded checkpoint '{}' (epoch {})"
@@ -100,7 +98,7 @@ def main(args):
         valid_loss, valid_acc = validate(val_loader, model, criterion, args.debug)
 
         # append logger file
-        logger.append([train_loss, valid_loss])
+        logger.append([train_loss, valid_loss, train_acc, valid_acc])
 
         # remember best acc and save checkpoint
         is_best = valid_acc > best_acc
@@ -109,7 +107,7 @@ def main(args):
             'epoch': epoch + 1,
             'arch': args.arch,
             'state_dict': model.state_dict(),
-            'best_prec1': best_prec1,
+            'best_acc': best_acc,
             'optimizer' : optimizer.state_dict(),
         }, is_best, checkpoint=args.checkpoint)
 
@@ -238,14 +236,14 @@ def validate(val_loader, model, criterion, debug=False):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total: }| ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
+        bar.suffix  = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
                     batch=i,
                     size=len(val_loader),
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
                     loss=losses.avg,
-                    acc=acces.avg,
+                    acc=acces.avg
                     )
         bar.next()
 

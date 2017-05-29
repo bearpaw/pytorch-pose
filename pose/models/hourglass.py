@@ -53,13 +53,8 @@ class Hourglass(nn.Module):
         super(Hourglass, self).__init__()
         self.depth = depth
         self.block = block
-        # self.residual = self._make_layer(block, num_blocks, planes)
-        # self.bn = nn.BatchNorm2d(planes)
         self.upsample = nn.UpsamplingNearest2d(scale_factor=2)
         self.hg = self._make_hour_glass(block, num_blocks, planes, depth)
-        # self.debug = self._make_residual(block, num_blocks, planes)
-        # print(self.hg)
-        # print(self.hg)
 
     def _make_residual(self, block, num_blocks, planes):
         layers = []
@@ -116,15 +111,17 @@ class HourglassNet(nn.Module):
 
         # build hourglass modules
         ch = self.num_feats*block.expansion
-        hg, fc, score, fc_, score_ = [],  [], [], [], []
+        hg, res, fc, score, fc_, score_ = [],  [], [], [], [], []
         for i in range(num_stacks):
             hg.append(Hourglass(block, num_blocks, 64, 4))
+            res.append(self._make_residual(block, self.num_feats, 1))
             fc.append(self._make_fc(ch))
             score.append(nn.Conv2d(ch, num_classes, kernel_size=1, bias=False))
             if i < num_stacks-1:
                 fc_.append(nn.Conv2d(ch, ch, kernel_size=1, bias=False))
                 score_.append(nn.Conv2d(num_classes, ch, kernel_size=1, bias=False))
         self.hg = nn.ModuleList(hg)
+        self.res = nn.ModuleList(res)
         self.fc = nn.ModuleList(fc)
         self.score = nn.ModuleList(score)
         self.fc_ = nn.ModuleList(fc)
@@ -160,9 +157,9 @@ class HourglassNet(nn.Module):
         bn = nn.BatchNorm2d(planes)
         conv = nn.Conv2d(planes, planes, kernel_size=1, bias=False)
         return nn.Sequential(
+                conv,
                 bn,
                 self.relu,
-                conv
             )
 
     def forward(self, x):
@@ -172,21 +169,21 @@ class HourglassNet(nn.Module):
         x = self.relu(x)    
 
         x = self.layer1(x)  
-        x = self.layer2(x)  
         x = self.maxpool(x)
+        x = self.layer2(x)  
         x = self.layer3(x)  
 
-        y = x.clone()
+        # y = x.clone()
         for i in range(self.num_stacks):
-            x = self.hg[i](x)
-            x = self.fc[i](x)
-            score = self.score[i](x)
+            y = self.hg[i](x)
+            y = self.res[i](y)
+            y = self.fc[i](y)
+            score = self.score[i](y)
             out.append(score)
             if i < self.num_stacks-1:
-                fc_ = self.fc_[i](x)
+                fc_ = self.fc_[i](y)
                 score_ = self.score_[i](score)
-                x = y + fc_ + score_
-                y = x.clone()
+                x = x + fc_ + score_
 
         return out
 
