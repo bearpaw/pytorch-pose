@@ -219,7 +219,7 @@ def validate(val_loader, model, criterion, debug=False, final=True):
 
         # generate predictions
         preds = final_preds(output[-1].data.cpu(), meta['center'], meta['scale'], [64, 64])
-        for n in range(len(output)):
+        for n in range(output[-1].size(0)):
             predictions[meta['index'][n], :, :] = preds[n, :, :]
 
 

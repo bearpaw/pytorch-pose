@@ -38,7 +38,6 @@ class Mpii(data.Dataset):
 
     def _compute_mean(self):
         meanstd_file = './data/mpii/mean.pth.tar'
-        print('\n=> Get mean/std...')
         if isfile(meanstd_file):
             meanstd = torch.load(meanstd_file)
         else:
