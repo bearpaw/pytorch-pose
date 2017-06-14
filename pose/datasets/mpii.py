@@ -57,8 +57,8 @@ class Mpii(data.Dataset):
                 'std': std,
                 }
             torch.save(meanstd, meanstd_file)
-        print('   Mean: %.2f, %.2f, %.2f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
-        print('   Std:  %.2f, %.2f, %.2f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
+        print('   Mean: %.4f, %.4f, %.4f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
+        print('   Std:  %.4f, %.4f, %.4f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
         return meanstd['mean'], meanstd['std']
 
 
@@ -72,7 +72,9 @@ class Mpii(data.Dataset):
 
         img_path = os.path.join(self.img_folder, a['img_paths'])
         pts = torch.Tensor(a['joint_self'])
-        c = torch.Tensor(a['objpos'])
+        pts[:,0:2] -= 1 # Convert pts to zero based
+
+        c = torch.Tensor(a['objpos']) - 1
         s = a['scale_provided']
 
         # Adjust center/scale slightly to avoid cropping limbs
@@ -85,7 +87,7 @@ class Mpii(data.Dataset):
         img = load_image(img_path) # CxHxW
 
         r = 0
-        if self.is_train == True:
+        if self.is_train    :
             s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf,1+sf)[0]
             r = torch.randn(1).mul_(rf).clamp(-2*rf,2*rf)[0] if random.random() <= 0.9 else 0
 
@@ -115,7 +117,11 @@ class Mpii(data.Dataset):
             if tpts[i, 2] > 0:
                 target[i] = draw_gaussian(target[i], tpts[i], self.sigma)
 
-        return inp, target
+        # Meta info
+        meta = {'index' : index, 'center' : c, 'scale' : s, 
+        'rotation' : r, 'pts' : pts, 'tpts' : tpts}
+
+        return inp, target, meta
 
     def __len__(self):
         if self.is_train:

@@ -1,10 +1,12 @@
 from __future__ import absolute_import
 
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from random import randint
 
 from .misc import *
+from .transforms import transform, transform_preds
 
 __all__ = ['accuracy', 'AverageMeter']
 
@@ -64,6 +66,30 @@ def accuracy(output, target, idxs, thr=0.5):
     if cnt != 0:  
         acc[0] = avg_acc / cnt
     return acc
+
+def final_preds(output, center, scale, res):
+    coords = get_preds(output).float() + 0.7
+
+    # pose-processing
+    for n in range(coords.size(0)):
+        for p in range(coords.size(1)):
+            hm = output[n][p]
+            px = int(math.floor(coords[n][p][0]))
+            py = int(math.floor(coords[n][p][1]))
+            if px > 0 and px < res[0]-1 and py > 0 and py < res[1]-1:
+                diff = torch.Tensor([hm[py][px+1]-hm[py][px-1], hm[py+1][px]-hm[py-1][px]])
+                coords[n][p] += diff.sign() * .25
+    output = coords.clone()
+
+    # Transform back
+    for i in range(coords.size(0)):
+        output[i] = transform_preds(coords[i], center[i], scale[i], res)
+
+    if output.dim() < 3:
+        output = output.view(1, output.size())
+
+    return output
+
     
 class AverageMeter(object):
     """Computes and stores the average and current value"""

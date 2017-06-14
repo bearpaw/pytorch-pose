@@ -26,12 +26,14 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
 ## Usage
 Run the following command in terminal to train a single stack of hourglass network on the MPII human pose dataset. 
 ```
-CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg1 -j 4 -b 12 --checkpoint checkpoint/mpii/hg1
+CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg1 --checkpoint checkpoint/mpii/hg1 -j 4 
 ```
-Here, `CUDA_VISIBLE_DEVICES=0` identifies the GPU devices you want to use. For example, use `CUDA_VISIBLE_DEVICES=0,1` if you want to use two GPUs with ID `0` and `1`. `-j` specifies how many workers you want to use for data loading. `-b` specifies the size of the minibatch.
+Here, 
+* `CUDA_VISIBLE_DEVICES=0` identifies the GPU devices you want to use. For example, use `CUDA_VISIBLE_DEVICES=0,1` if you want to use two GPUs with ID `0` and `1`. 
+* `-j` specifies how many workers you want to use for data loading. 
+* `--checkpoint` specifies where you want to save the models, the log and the predictions to.
 
 Please refer to the `example/mpii.py` for the supported options/arguments.
-
 
 ## To Do List
 Supported dataset
@@ -40,10 +42,10 @@ Supported dataset
 - [ ] LSP
 
 Supported models
-- [x] One-stack hourglass networks
-- [ ] Stacked hourglass networks 
+- [x] [Stacked Hourglass networks](https://arxiv.org/abs/1603.06937)
 
-**I have trouble in implementing multiple stacks of hourglass networks (overfitting). Please create a pull request if you want to contribute.**
+## Contribute
+Please create a pull request if you want to contribute.
 
 
 

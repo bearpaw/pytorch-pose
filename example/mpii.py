@@ -6,13 +6,15 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.nn.parallel
+import torch.backends.cudnn as cudnn
 import torch.optim
 import torchvision.datasets as datasets
+import torchvision.transforms as transforms
 
 from pose import Bar
 from pose.utils.logger import Logger
-from pose.utils.evaluation import accuracy, AverageMeter
-from pose.utils.misc import save_checkpoint, adjust_learning_rate
+from pose.utils.evaluation import accuracy, AverageMeter, final_preds
+from pose.utils.misc import save_checkpoint, save_pred, adjust_learning_rate
 from pose.utils.osutils import mkdir_p, isfile, isdir, join
 from pose.utils.imutils import batch_with_heatmap
 import pose.models as models
@@ -35,10 +37,10 @@ def main(args):
 
     # create model
     if args.pretrained:
-        print("=> using pre-trained model '{}'".format(args.arch))
+        print("==> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](pretrained=True)
     else:
-        print("=> creating model '{}'".format(args.arch))
+        print("==> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch](num_classes=16)
 
     model = torch.nn.DataParallel(model).cuda()
@@ -68,37 +70,40 @@ def main(args):
             print("=> no checkpoint found at '{}'".format(args.resume))
     else:        
         logger = Logger(join(args.checkpoint, 'log.txt'), title=title)
-        logger.set_names(['Train Loss', 'Val Loss', 'Train Acc', 'Val Acc'])
+        logger.set_names(['Train Loss', 'Val Loss', 'Val Acc'])
 
-    torch.backends.cudnn.benchmark = True
+    cudnn.benchmark = True
+    print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
         datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images'),
-        batch_size=args.batch_size, shuffle=True,
+        batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
         datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', train=False),
-        batch_size=args.batch_size, shuffle=False,
+        batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args.debug)
+        print('\nEvaluation only') 
+        loss, acc, predictions = validate(val_loader, model, criterion, args.debug)
+        save_pred(predictions, checkpoint=args.checkpoint)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
         lr = adjust_learning_rate(optimizer, epoch, args.lr)
-        print('\nEpoch: %d | LR: %.8f' % (epoch, lr)) 
+        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr)) 
 
         # train for one epoch
-        train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args.debug)
+        train_loss = train(train_loader, model, criterion, optimizer, epoch, args.debug)
 
         # evaluate on validation set
-        valid_loss, valid_acc = validate(val_loader, model, criterion, args.debug)
+        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.debug)
 
         # append logger file
-        logger.append([train_loss, valid_loss, train_acc, valid_acc])
+        logger.append([train_loss, valid_loss, valid_acc])
 
         # remember best acc and save checkpoint
         is_best = valid_acc > best_acc
@@ -109,7 +114,7 @@ def main(args):
             'state_dict': model.state_dict(),
             'best_acc': best_acc,
             'optimizer' : optimizer.state_dict(),
-        }, is_best, checkpoint=args.checkpoint)
+        }, predictions, is_best, checkpoint=args.checkpoint)
 
     logger.close()
     logger.plot()
@@ -119,7 +124,6 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    acces = AverageMeter()
 
     # switch to train mode
     model.train()
@@ -128,25 +132,24 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
 
     gt_win, pred_win = None, None
     bar = Bar('Processing', max=len(train_loader))
-    for i, (input, target) in enumerate(train_loader):
+    for i, (inputs, target, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(input)
+        input_var = torch.autograd.Variable(inputs)
         target_var = torch.autograd.Variable(target)
 
         # compute output
         output = model(input_var)
 
-        loss = 0
-        for o in output:
-            loss += criterion(o, target_var)
-        acc = accuracy(output[-1].data, target_var.data, idx)
+        loss = criterion(output[0], target_var)
+        for j in range(1, len(output)):
+            loss += criterion(output[j], target_var)
 
         if debug: # visualize groundtruth and predictions
-            gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, output[-1].data)
+            gt_batch_img = batch_with_heatmap(inputs, target)
+            pred_batch_img = batch_with_heatmap(inputs, output[-1].data)
             if not gt_win or not pred_win:
                 ax1 = plt.subplot(121)
                 ax1.title.set_text('Groundtruth')
@@ -161,8 +164,7 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
             plt.draw()
 
         # measure accuracy and record loss
-        acces.update(acc[0], input.size(0))
-        losses.update(loss.data[0], input.size(0))
+        losses.update(loss.data[0], inputs.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -174,26 +176,28 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                    batch=i,
+        bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}'.format(
+                    batch=i + 1,
                     size=len(train_loader),
                     data=data_time.avg,
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
                     loss=losses.avg,
-                    acc=acces.avg
                     )
         bar.next()
 
     bar.finish()
-    return losses.avg, acces.avg
+    return losses.avg
 
 
-def validate(val_loader, model, criterion, debug=False):
+def validate(val_loader, model, criterion, debug=False, final=True):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acces = AverageMeter()
+
+    # predictions
+    predictions = torch.Tensor(val_loader.dataset.__len__(), 16, 2)
 
     # switch to evaluate mode
     model.eval()
@@ -201,9 +205,9 @@ def validate(val_loader, model, criterion, debug=False):
     gt_win, pred_win = None, None
     end = time.time()
     bar = Bar('Processing', max=len(val_loader))
-    for i, (input, target) in enumerate(val_loader):
+    for i, (inputs, target, meta) in enumerate(val_loader): 
         target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(input, volatile=True)
+        input_var = torch.autograd.Variable(inputs, volatile=True)
         target_var = torch.autograd.Variable(target, volatile=True)
 
         # compute output
@@ -213,9 +217,15 @@ def validate(val_loader, model, criterion, debug=False):
             loss += criterion(o, target_var)
         acc = accuracy(output[-1].data, target_var.data, idx)
 
+        # generate predictions
+        preds = final_preds(output[-1].data.cpu(), meta['center'], meta['scale'], [64, 64])
+        for n in range(len(output)):
+            predictions[meta['index'][n], :, :] = preds[n, :, :]
+
+
         if debug:
-            gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, output[-1].data)
+            gt_batch_img = batch_with_heatmap(inputs, target)
+            pred_batch_img = batch_with_heatmap(inputs, output[-1].data)
             if not gt_win or not pred_win:
                 plt.subplot(121)
                 gt_win = plt.imshow(gt_batch_img)
@@ -228,8 +238,8 @@ def validate(val_loader, model, criterion, debug=False):
             plt.draw()
 
         # measure accuracy and record loss
-        losses.update(loss.data[0], input.size(0))
-        acces.update(acc[0], input.size(0))
+        losses.update(loss.data[0], inputs.size(0))
+        acces.update(acc[0], inputs.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -237,7 +247,7 @@ def validate(val_loader, model, criterion, debug=False):
 
         # plot progress
         bar.suffix  = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                    batch=i,
+                    batch=i + 1,
                     size=len(val_loader),
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
@@ -248,7 +258,7 @@ def validate(val_loader, model, criterion, debug=False):
         bar.next()
 
     bar.finish()
-    return losses.avg, acces.avg
+    return losses.avg, acces.avg, predictions
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -263,8 +273,10 @@ if __name__ == '__main__':
                         help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
-    parser.add_argument('-b', '--batch-size', default=1, type=int,
-                        metavar='N', help='mini-batch size (default: 6)')
+    parser.add_argument('--train-batch', default=6, type=int, metavar='N',
+                        help='train batchsize')
+    parser.add_argument('--test-batch', default=6, type=int, metavar='N',
+                        help='test batchsize')
     parser.add_argument('--lr', '--learning-rate', default=2.5e-4, type=float,
                         metavar='LR', help='initial learning rate')
     parser.add_argument('--momentum', default=0, type=float, metavar='M',

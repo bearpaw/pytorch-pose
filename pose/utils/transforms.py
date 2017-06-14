@@ -39,10 +39,10 @@ def fliplr(x):
     x = np.transpose(np.fliplr(np.transpose(x, (0, 2, 1))), (0, 2, 1))
     return x.astype(float)
 
-# =============================================================================
-# General image processing functions
-# =============================================================================
 
+"""
+General image processing functions
+"""
 def get_transform(center, scale, res, rot=0):
     # Generate transformation matrix
     h = 200 * scale
@@ -77,6 +77,14 @@ def transform(pt, center, scale, res, invert=0, rot=0):
     new_pt = np.array([pt[0], pt[1], 1.]).T
     new_pt = np.dot(t, new_pt)
     return new_pt[:2].astype(int)
+
+def transform_preds(coords, center, scale, res):
+    # size = coords.size()
+    # coords = coords.view(-1, coords.size(-1))
+    # print(coords.size())
+    for p in range(coords.size(0)):
+        coords[p, 0:2] = to_torch(transform(coords[p, 0:2], center, scale, res, 1, 0))
+    return coords
 
 def crop(img, center, scale, res, rot=0):
     img = im_to_numpy(img)
