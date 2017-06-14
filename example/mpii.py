@@ -132,7 +132,7 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
 
     gt_win, pred_win = None, None
     bar = Bar('Processing', max=len(train_loader))
-    for i, (inputs, target, meta) in enumerate(train_loader):
+    for i, (inputs, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 

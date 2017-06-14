@@ -57,8 +57,10 @@ class Mpii(data.Dataset):
                 'std': std,
                 }
             torch.save(meanstd, meanstd_file)
-        print('   Mean: %.4f, %.4f, %.4f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
-        print('   Std:  %.4f, %.4f, %.4f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
+        if self.is_train:
+            print('   Mean: %.4f, %.4f, %.4f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
+            print('   Std:  %.4f, %.4f, %.4f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
+            
         return meanstd['mean'], meanstd['std']
 
 
@@ -119,9 +121,12 @@ class Mpii(data.Dataset):
 
         # Meta info
         meta = {'index' : index, 'center' : c, 'scale' : s, 
-        'rotation' : r, 'pts' : pts, 'tpts' : tpts}
+        'pts' : pts, 'tpts' : tpts}
 
-        return inp, target, meta
+        if self.is_train:
+            return inp, target
+        else:
+            return inp, target, meta
 
     def __len__(self):
         if self.is_train:
