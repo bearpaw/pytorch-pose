@@ -92,30 +92,16 @@ class Mpii(data.Dataset):
             s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf,1+sf)[0]
             r = torch.randn(1).mul_(rf).clamp(-2*rf,2*rf)[0] if random.random() <= 0.9 else 0
 
-            # Color
-            img[0, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
-            img[1, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
-            img[2, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
-
-            # Flip
-            if random.random() <= 0.5:
-                img = torch.from_numpy(fliplr(img.numpy())).float()
-                pts = shufflelr(pts, width=img.size(2), dataset='mpii')
-                c[0] = img.size(2) - c[0]
-
         # Prepare image and groundtruth map
         inp = crop(img, c, s, [self.inp_res, self.inp_res], rot=r)
         inp = color_normalize(inp, self.mean, self.std)
 
         # Generate ground truth
         tpts = pts.clone()
-        for i in range(nparts):
-            if tpts[i, 2] > 0:
-                tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2], c, s, [self.out_res, self.out_res], rot=r))
-
         target = torch.zeros(nparts, self.out_res, self.out_res)
         for i in range(nparts):
             if tpts[i, 2] > 0:
+                tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2], c, s, [self.out_res, self.out_res], rot=r))
                 target[i] = draw_gaussian(target[i], tpts[i], self.sigma)
 
         # Meta info
@@ -123,6 +109,18 @@ class Mpii(data.Dataset):
         'pts' : pts, 'tpts' : tpts}
 
         if self.is_train:
+
+            # Color
+            inp[0, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
+            inp[1, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
+            inp[2, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
+
+            # Flip
+            if random.random() <= 0.5:
+                inp = torch.from_numpy(fliplr(inp.numpy())).float()
+                pts = shufflelr(pts, width=inp.size(2), dataset='mpii')
+                c[0] = inp.size(2) - c[0]
+
             return inp, target
         else:
             return inp, target, meta
