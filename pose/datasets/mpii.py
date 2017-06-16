@@ -57,8 +57,8 @@ class Mpii(data.Dataset):
                 }
             torch.save(meanstd, meanstd_file)
         if self.is_train:
-            print('   Mean: %.4f, %.4f, %.4f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
-            print('   Std:  %.4f, %.4f, %.4f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
+            print('    Mean: %.4f, %.4f, %.4f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
+            print('    Std:  %.4f, %.4f, %.4f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
             
         return meanstd['mean'], meanstd['std']
 
@@ -92,6 +92,12 @@ class Mpii(data.Dataset):
             s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf,1+sf)[0]
             r = torch.randn(1).mul_(rf).clamp(-2*rf,2*rf)[0] if random.random() <= 0.9 else 0
 
+            # Flip
+            if random.random() <= 0.5:
+                img = torch.from_numpy(fliplr(img.numpy())).float()
+                pts = shufflelr(pts, width=img.size(2), dataset='mpii')
+                c[0] = img.size(2) - c[0]
+
         # Prepare image and groundtruth map
         inp = crop(img, c, s, [self.inp_res, self.inp_res], rot=r)
         inp = color_normalize(inp, self.mean, self.std)
@@ -115,11 +121,6 @@ class Mpii(data.Dataset):
             inp[1, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
             inp[2, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
 
-            # Flip
-            if random.random() <= 0.5:
-                inp = torch.from_numpy(fliplr(inp.numpy())).float()
-                pts = shufflelr(pts, width=inp.size(2), dataset='mpii')
-                c[0] = inp.size(2) - c[0]
 
             return inp, target
         else:

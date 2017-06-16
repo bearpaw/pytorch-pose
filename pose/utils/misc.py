@@ -36,7 +36,7 @@ def save_checkpoint(state, preds, is_best, checkpoint='checkpoint', filename='ch
         scipy.io.savemat(os.path.join(checkpoint, 'preds_best.mat'), mdict={'preds' : preds})
 
 
-def save_pred(preds, checkpoint='checkpoint', filename='pred-valid.mat'):
+def save_pred(preds, checkpoint='checkpoint', filename='preds_valid.mat'):
     preds = to_numpy(preds)
     filepath = os.path.join(checkpoint, filename)
     scipy.io.savemat(filepath, mdict={'preds' : preds})

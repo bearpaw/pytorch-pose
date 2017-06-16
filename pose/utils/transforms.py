@@ -14,7 +14,34 @@ def color_normalize(x, mean, std):
         x = x.repeat(3, x.size(1), x.size(2))
     return (x - mean.view(3, 1, 1).expand_as(x)) #/ std.view(3, 1, 1).expand_as(x)
 
+
+def flip_back(flip_output, dataset='mpii'):
+    """
+    flip output map
+    """
+    if dataset ==  'mpii':
+        matchedParts = (
+            [0,5],   [1,4],   [2,3],
+            [10,15], [11,14], [12,13]
+        )
+    else:
+        print('Not supported dataset: ' + dataset)
+
+    # flip output horizontally
+    flip_output = fliplr(flip_output.numpy())
+
+    # Change left-right parts
+    for pair in matchedParts:
+        tmp = np.copy(flip_output[:, pair[0], :, :])
+        flip_output[:, pair[0], :, :] = flip_output[:, pair[1], :, :]
+        flip_output[:, pair[1], :, :] = tmp
+
+    return torch.from_numpy(flip_output).float()
+
 def shufflelr(x, width, dataset='mpii'):
+    """
+    flip coords
+    """
     if dataset ==  'mpii':
         matchedParts = (
             [0,5],   [1,4],   [2,3],
@@ -36,7 +63,11 @@ def shufflelr(x, width, dataset='mpii'):
 
 
 def fliplr(x):
-    x = np.transpose(np.fliplr(np.transpose(x, (0, 2, 1))), (0, 2, 1))
+    if x.ndim == 3:
+        x = np.transpose(np.fliplr(np.transpose(x, (0, 2, 1))), (0, 2, 1))
+    elif x.ndim == 4:
+        for i in range(x.shape[0]):
+            x[i] = np.transpose(np.fliplr(np.transpose(x[i], (0, 2, 1))), (0, 2, 1))
     return x.astype(float)
 
 

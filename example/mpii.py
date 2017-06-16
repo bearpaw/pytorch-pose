@@ -17,6 +17,7 @@ from pose.utils.evaluation import accuracy, AverageMeter, final_preds
 from pose.utils.misc import save_checkpoint, save_pred, adjust_learning_rate
 from pose.utils.osutils import mkdir_p, isfile, isdir, join
 from pose.utils.imutils import batch_with_heatmap
+from pose.utils.transforms import fliplr, flip_back
 import pose.models as models
 import pose.datasets as datasets
 
@@ -88,7 +89,7 @@ def main(args):
 
     if args.evaluate:
         print('\nEvaluation only') 
-        loss, acc, predictions = validate(val_loader, model, criterion, args.debug)
+        loss, acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
         save_pred(predictions, checkpoint=args.checkpoint)
         return
 
@@ -100,7 +101,7 @@ def main(args):
         train_loss = train(train_loader, model, criterion, optimizer, epoch, args.debug)
 
         # evaluate on validation set
-        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.debug)
+        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
 
         # append logger file
         logger.append([train_loss, valid_loss, valid_acc])
@@ -136,6 +137,7 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
         # measure data loading time
         data_time.update(time.time() - end)
 
+        inputs = inputs.cuda()
         target = target.cuda(async=True)
         input_var = torch.autograd.Variable(inputs)
         target_var = torch.autograd.Variable(target)
@@ -176,11 +178,11 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}'.format(
+        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}'.format(
                     batch=i + 1,
                     size=len(train_loader),
-                    data=data_time.avg,
-                    bt=batch_time.avg,
+                    data=data_time.val,
+                    bt=batch_time.val,
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
                     loss=losses.avg,
@@ -191,7 +193,7 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
     return losses.avg
 
 
-def validate(val_loader, model, criterion, debug=False, final=True):
+def validate(val_loader, model, criterion, debug=False, flip=True):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acces = AverageMeter()
@@ -207,25 +209,38 @@ def validate(val_loader, model, criterion, debug=False, final=True):
     bar = Bar('Processing', max=len(val_loader))
     for i, (inputs, target, meta) in enumerate(val_loader): 
         target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(inputs, volatile=True)
+
+        input_var = torch.autograd.Variable(inputs.cuda(), volatile=True)
         target_var = torch.autograd.Variable(target, volatile=True)
 
         # compute output
         output = model(input_var)
+        score_map = output[-1].data.cpu()
+        if flip:
+            flip_input_var = torch.autograd.Variable(
+                    torch.from_numpy(fliplr(inputs.clone().numpy())).float().cuda(), 
+                    volatile=True
+                )
+            flip_output_var = model(flip_input_var)
+            flip_output = flip_back(flip_output_var[-1].data.cpu())
+            score_map += flip_output
+
+
+
         loss = 0
         for o in output:
             loss += criterion(o, target_var)
-        acc = accuracy(output[-1].data, target_var.data, idx)
+        acc = accuracy(score_map.cuda(), target, idx)
 
         # generate predictions
-        preds = final_preds(output[-1].data.cpu(), meta['center'], meta['scale'], [64, 64])
-        for n in range(output[-1].size(0)):
+        preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
+        for n in range(score_map.size(0)):
             predictions[meta['index'][n], :, :] = preds[n, :, :]
 
 
         if debug:
             gt_batch_img = batch_with_heatmap(inputs, target)
-            pred_batch_img = batch_with_heatmap(inputs, output[-1].data)
+            pred_batch_img = batch_with_heatmap(inputs, score_map)
             if not gt_win or not pred_win:
                 plt.subplot(121)
                 gt_win = plt.imshow(gt_batch_img)
@@ -295,4 +310,6 @@ if __name__ == '__main__':
                         help='show intermediate results')
     parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                         help='use pre-trained model')
+    parser.add_argument('-f', '--flip', dest='flip', action='store_true',
+                        help='flip the input during validation')
     main(parser.parse_args())
