@@ -37,12 +37,8 @@ def main(args):
         mkdir_p(args.checkpoint)
 
     # create model
-    if args.pretrained:
-        print("==> using pre-trained model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](pretrained=True)
-    else:
-        print("==> creating model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](num_classes=16)
+    print("==> creating model '{}'".format(args.arch))
+    model = models.__dict__[args.arch](num_classes=16)
 
     model = torch.nn.DataParallel(model).cuda()
 
@@ -308,8 +304,6 @@ if __name__ == '__main__':
                         help='evaluate model on validation set')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help='show intermediate results')
-    parser.add_argument('--pretrained', dest='pretrained', action='store_true',
-                        help='use pre-trained model')
     parser.add_argument('-f', '--flip', dest='flip', action='store_true',
                         help='flip the input during validation')
     main(parser.parse_args())
