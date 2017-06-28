@@ -81,10 +81,8 @@ for r in range(len(rng)):
 
 name = predfile.split(os.sep)[-1]
 PCKh = np.ma.array(PCKh, mask=False)
-PCKh.mask[6:7] = True
+PCKh.mask[6:8] = True
 print("Model,  Head,   Shoulder, Elbow,  Wrist,   Hip ,     Knee  , Ankle ,  Mean")
 print('{:s}   {:.2f}  {:.2f}     {:.2f}  {:.2f}   {:.2f}   {:.2f}   {:.2f}   {:.2f}'.format(model_name, PCKh[head], 0.5 * (PCKh[lsho] + PCKh[rsho])\
         , 0.5 * (PCKh[lelb] + PCKh[relb]),0.5 * (PCKh[lwri] + PCKh[rwri]), 0.5 * (PCKh[lhip] + PCKh[rhip]), 0.5 * (PCKh[lkne] + PCKh[rkne]) \
         , 0.5 * (PCKh[lank] + PCKh[rank]), np.mean(PCKh)))
-
-

@@ -4,6 +4,16 @@ PyTorch-Pose is a PyTorch implementation of the general pipeline for 2D single h
 
 Some codes for data preparation and augmentation are brought from the [Stacked hourglass network](https://github.com/anewell/pose-hg-train). Thanks to the original author. 
 
+**Table of Contents**  
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+   - [Testing](#testing)
+      - [Evaluate the PCKh@0.5 score](#evaluate-the-pckh05-score)
+   - [Training](#training)
+- [To Do List](#to-do-list)
+- [Contribute](#contribute)
+
 ## Features
 - Multi-thread data loading
 - Multi-GPU training
@@ -40,6 +50,9 @@ CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg4 --checkpoint checkpoint/mpi
 The result will be saved as a `.mat` file (`preds_valid.mat`), which is a `2958x16x2` matrix, in the folder specified by `--checkpoint`.
 
 #### Evaluate the PCKh@0.5 score
+
+##### Evaluate with MATLAB
+
 You may use the matlab script `evaluation/eval_PCKh.m` to evaluate your predictions. The evaluation code is ported from  [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip).
 
 The result (PCKh@0.5 score) of the [4-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing) trained using this code is reported in the following table.
@@ -49,6 +62,9 @@ The result (PCKh@0.5 score) of the [4-stack hourglass model](https://drive.googl
 | -------- | -----| -------- | ----- | ----- | ---- | ------|------ | ---- |
 | hg4      | 96.28| 92.34    | 82.60 | 78.10 | 83.42| 77.96 | 73.62 | 83.58|
 
+##### Evaluate with Python
+
+You may also evaluate the result by running `python evaluation/eval_PCKh.py` to evaluate the predictions. It will produce exactly the same result as that of the MATLAB.
 
 ### Training
 Run the following command in terminal to train a single stack of hourglass network on the MPII human pose dataset. 
