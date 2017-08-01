@@ -64,7 +64,7 @@ The result (PCKh@0.5 score) of the [4-stack hourglass model](https://drive.googl
 
 ##### Evaluate with Python
 
-You may also evaluate the result by running `python evaluation/eval_PCKh.py` to evaluate the predictions. It will produce exactly the same result as that of the MATLAB. Thanks [@sssruhan1](https://github.com/sssruhan1) for the [contribution](https://github.com/bearpaw/pytorch-pose/pull/2)
+You may also evaluate the result by running `python evaluation/eval_PCKh.py` to evaluate the predictions. It will produce exactly the same result as that of the MATLAB. Thanks [@sssruhan1](https://github.com/sssruhan1) for the [contribution](https://github.com/bearpaw/pytorch-pose/pull/2).
 
 ### Training
 Run the following command in terminal to train a single stack of hourglass network on the MPII human pose dataset. 
