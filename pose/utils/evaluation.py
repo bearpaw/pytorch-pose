@@ -16,6 +16,10 @@ def get_preds(scores):
     '''
     assert scores.dim() == 4, 'Score maps should be 4-dim'
     maxval, idx = torch.max(scores.view(scores.size(0), scores.size(1), -1), 2)
+    
+    maxval = maxval.view(scores.size(0), scores.size(1), 1)
+    idx = idx.view(scores.size(0), scores.size(1), 1)
+    
     preds = idx.repeat(1, 1, 2)
 
     preds[:,:,0] = preds[:,:,0] % scores.size(3)
