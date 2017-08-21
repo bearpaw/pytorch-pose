@@ -37,8 +37,8 @@ def main(args):
         mkdir_p(args.checkpoint)
 
     # create model
-    print("==> creating model '{}'".format(args.arch))
-    model = models.__dict__[args.arch](num_classes=16)
+    print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
+    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=16)
 
     model = torch.nn.DataParallel(model).cuda()
 
@@ -143,14 +143,6 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
         # compute output
         output = model(input_var)
         score_map = output[-1].data.cpu()
-        if flip:
-            flip_input_var = torch.autograd.Variable(
-                    torch.from_numpy(fliplr(inputs.clone().numpy())).float().cuda(),
-                    volatile=True
-                )
-            flip_output_var = model(flip_input_var)
-            flip_output = flip_back(flip_output_var[-1].data.cpu())
-            score_map += flip_output
 
         loss = criterion(output[0], target_var)
         for j in range(1, len(output)):
@@ -187,7 +179,7 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f}'.format(
+        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
                     batch=i + 1,
                     size=len(train_loader),
                     data=data_time.val,
@@ -195,6 +187,7 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
                     loss=losses.avg,
+                    acc=acces.avg
                     )
         bar.next()
 
@@ -306,7 +299,7 @@ if __name__ == '__main__':
     parser.add_argument('--momentum', default=0, type=float, metavar='M',
                         help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=0, type=float,
-                        metavar='W', help='weight decay (default: 1e-4)')
+                        metavar='W', help='weight decay (default: 0)')
     parser.add_argument('--print-freq', '-p', default=10, type=int,
                         metavar='N', help='print frequency (default: 10)')
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
@@ -319,4 +312,13 @@ if __name__ == '__main__':
                         help='show intermediate results')
     parser.add_argument('-f', '--flip', dest='flip', action='store_true',
                         help='flip the input during validation')
+    # Model structure
+    parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
+                        help='Number of hourglasses to stack')
+    parser.add_argument('--features', default=256, type=int, metavar='N',
+                        help='Number of features in the hourglass')
+    parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
+                        help='Number of residual modules at each location in the hourglass')
+
+
     main(parser.parse_args())

@@ -5,16 +5,18 @@ Use lr=0.01 for current version
 '''
 import torch.nn as nn
 import torch.nn.functional as F
-import math
+
 # from .preresnet import BasicBlock, Bottleneck
 
-__all__ = ['HourglassNet', 'hg1', 'hg2', 'hg4', 'hg8']
+
+__all__ = ['HourglassNet', 'hg']
 
 class Bottleneck(nn.Module):
     expansion = 2
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
+
         self.bn1 = nn.BatchNorm2d(inplanes)
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=True)
         self.bn2 = nn.BatchNorm2d(planes)
@@ -48,6 +50,7 @@ class Bottleneck(nn.Module):
 
         return out
 
+
 class Hourglass(nn.Module):
     def __init__(self, block, num_blocks, planes, depth):
         super(Hourglass, self).__init__()
@@ -72,7 +75,6 @@ class Hourglass(nn.Module):
                 res.append(self._make_residual(block, num_blocks, planes))
             hg.append(nn.ModuleList(res))
         return nn.ModuleList(hg)
-
 
     def _hour_glass_forward(self, n, x):
         up1 = self.hg[n-1][0](x)
@@ -176,18 +178,8 @@ class HourglassNet(nn.Module):
 
         return out
 
-def hg1(**kwargs):
-    model = HourglassNet(Bottleneck, num_stacks=1, num_blocks=8, **kwargs)
-    return model
 
-def hg2(**kwargs):
-    model = HourglassNet(Bottleneck, num_stacks=2, num_blocks=4, **kwargs)
-    return model
-
-def hg4(**kwargs):
-    model = HourglassNet(Bottleneck, num_stacks=4, num_blocks=2, **kwargs)
-    return model
-
-def hg8(**kwargs):
-    model = HourglassNet(Bottleneck, num_stacks=8, num_blocks=1, **kwargs)
+def hg(**kwargs):
+    model = HourglassNet(Bottleneck, num_stacks=kwargs['num_stacks'], num_blocks=kwargs['num_blocks'],
+                         num_classes=kwargs['num_classes'])
     return model

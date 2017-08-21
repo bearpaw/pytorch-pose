@@ -40,7 +40,7 @@ You may download our pretrained [4-stack hourglass model](https://drive.google.c
 
 Run the following command in terminal to evaluate the model on MPII validation split (The train/val split is from [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip)).
 ```
-CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg4 --checkpoint checkpoint/mpii/hg4 --resume checkpoint/mpii/hg4/model_best.pth.tar -e -d 
+CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg --stacks 4 --blocks 2 --checkpoint checkpoint/mpii/hg4 --resume checkpoint/mpii/hg4/model_best.pth.tar -e -d
 ```
 * `-a` specifies a network architecture
 * `--resume` will load the weight from a specific model
@@ -67,9 +67,9 @@ The result (PCKh@0.5 score) of the [4-stack hourglass model](https://drive.googl
 You may also evaluate the result by running `python evaluation/eval_PCKh.py` to evaluate the predictions. It will produce exactly the same result as that of the MATLAB. Thanks [@sssruhan1](https://github.com/sssruhan1) for the [contribution](https://github.com/bearpaw/pytorch-pose/pull/2).
 
 ### Training
-Run the following command in terminal to train a single stack of hourglass network on the MPII human pose dataset. 
+Run the following command in terminal to train an 8-stack of hourglass network on the MPII human pose dataset.
 ```
-CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg1 --checkpoint checkpoint/mpii/hg1 -j 4 
+CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg --stacks 8 --blocks 1 --checkpoint checkpoint/mpii/hg8 -j 4
 ```
 Here, 
 * `CUDA_VISIBLE_DEVICES=0` identifies the GPU devices you want to use. For example, use `CUDA_VISIBLE_DEVICES=0,1` if you want to use two GPUs with ID `0` and `1`. 
