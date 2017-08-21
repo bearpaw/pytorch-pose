@@ -53,7 +53,7 @@ class Hourglass(nn.Module):
         super(Hourglass, self).__init__()
         self.depth = depth
         self.block = block
-        self.upsample = nn.UpsamplingNearest2d(scale_factor=2)
+        self.upsample = nn.Upsample(scale_factor=2)
         self.hg = self._make_hour_glass(block, num_blocks, planes, depth)
 
     def _make_residual(self, block, num_blocks, planes):

@@ -94,13 +94,13 @@ def main(args):
         print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr)) 
 
         # train for one epoch
-        train_loss = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
+        train_loss, train_acc = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
 
         # evaluate on validation set
         valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
 
         # append logger file
-        logger.append([train_loss, valid_loss, valid_acc])
+        logger.append([epoch + 1, lr, train_loss, valid_loss, train_acc, valid_acc])
 
         # remember best acc and save checkpoint
         is_best = valid_acc > best_acc
