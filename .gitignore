@@ -6,6 +6,7 @@ data/mpii/images
 !data/mpii/mean.pth.tar
 *.json
 *debug*
+*.idea/*
 
 __pycache__/
 *.py[cod]

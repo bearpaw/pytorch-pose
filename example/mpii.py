@@ -9,7 +9,6 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 
 from pose import Bar
 from pose.utils.logger import Logger
@@ -28,6 +27,7 @@ model_names = sorted(name for name in models.__dict__
 idx = [1,2,3,4,5,6,11,12,15,16]
 
 best_acc = 0
+
 
 def main(args):
     global best_acc
@@ -67,7 +67,7 @@ def main(args):
             print("=> no checkpoint found at '{}'".format(args.resume))
     else:        
         logger = Logger(join(args.checkpoint, 'log.txt'), title=title)
-        logger.set_names(['Train Loss', 'Val Loss', 'Val Acc'])
+        logger.set_names(['Epoch', 'LR', 'Train Loss', 'Val Loss', 'Train Acc', 'Val Acc'])
 
     cudnn.benchmark = True
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
@@ -94,7 +94,7 @@ def main(args):
         print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr)) 
 
         # train for one epoch
-        train_loss = train(train_loader, model, criterion, optimizer, epoch, args.debug)
+        train_loss = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
 
         # evaluate on validation set
         valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
@@ -117,10 +117,12 @@ def main(args):
     logger.plot()
     savefig(os.path.join(args.checkpoint, 'log.eps'))
 
-def train(train_loader, model, criterion, optimizer, epoch, debug=False):
+
+def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
+    acces = AverageMeter()
 
     # switch to train mode
     model.train()
@@ -140,10 +142,20 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
 
         # compute output
         output = model(input_var)
+        score_map = output[-1].data.cpu()
+        if flip:
+            flip_input_var = torch.autograd.Variable(
+                    torch.from_numpy(fliplr(inputs.clone().numpy())).float().cuda(),
+                    volatile=True
+                )
+            flip_output_var = model(flip_input_var)
+            flip_output = flip_back(flip_output_var[-1].data.cpu())
+            score_map += flip_output
 
         loss = criterion(output[0], target_var)
         for j in range(1, len(output)):
             loss += criterion(output[j], target_var)
+        acc = accuracy(score_map.cuda(), target, idx)
 
         if debug: # visualize groundtruth and predictions
             gt_batch_img = batch_with_heatmap(inputs, target)
@@ -163,6 +175,7 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
 
         # measure accuracy and record loss
         losses.update(loss.data[0], inputs.size(0))
+        acces.update(acc[0], inputs.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -186,7 +199,7 @@ def train(train_loader, model, criterion, optimizer, epoch, debug=False):
         bar.next()
 
     bar.finish()
-    return losses.avg
+    return losses.avg, acces.avg
 
 
 def validate(val_loader, model, criterion, debug=False, flip=True):
