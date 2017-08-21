@@ -13,9 +13,10 @@ from pose.utils.osutils import *
 from pose.utils.imutils import *
 from pose.utils.transforms import *
 
+
 class Mpii(data.Dataset):
     def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, sigma=1,
-        scale_factor=0.25, rot_factor=30):
+                 scale_factor=0.25, rot_factor=30):
         self.img_folder = img_folder    # root image folders
         self.is_train = train           # training set or test set
         self.inp_res = inp_res
@@ -62,7 +63,6 @@ class Mpii(data.Dataset):
             
         return meanstd['mean'], meanstd['std']
 
-
     def __getitem__(self, index):
         sf = self.scale_factor
         rf = self.rot_factor
@@ -73,7 +73,7 @@ class Mpii(data.Dataset):
 
         img_path = os.path.join(self.img_folder, a['img_paths'])
         pts = torch.Tensor(a['joint_self'])
-        pts[:,0:2] -= 1 # Convert pts to zero based
+        pts[:, 0:2] -= 1  # Convert pts to zero based
 
         c = torch.Tensor(a['objpos']) - 1
         s = a['scale_provided']
@@ -85,12 +85,12 @@ class Mpii(data.Dataset):
 
         # For single-person pose estimation with a centered/scaled figure
         nparts = pts.size(0)
-        img = load_image(img_path) # CxHxW
+        img = load_image(img_path)  # CxHxW
 
         r = 0
-        if self.is_train    :
-            s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf,1+sf)[0]
-            r = torch.randn(1).mul_(rf).clamp(-2*rf,2*rf)[0] if random.random() <= 0.9 else 0
+        if self.is_train:
+            s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf, 1+sf)[0]
+            r = torch.randn(1).mul_(rf).clamp(-2*rf, 2*rf)[0] if random.random() <= 0.9 else 0
 
             # Flip
             if random.random() <= 0.5:
@@ -100,7 +100,6 @@ class Mpii(data.Dataset):
 
         # Prepare image and groundtruth map
         inp = crop(img, c, s, [self.inp_res, self.inp_res], rot=r)
-        inp = color_normalize(inp, self.mean, self.std)
 
         # Generate ground truth
         tpts = pts.clone()
