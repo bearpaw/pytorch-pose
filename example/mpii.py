@@ -11,7 +11,7 @@ import torch.optim
 import torchvision.datasets as datasets
 
 from pose import Bar
-from pose.utils.logger import Logger
+from pose.utils.logger import Logger, savefig
 from pose.utils.evaluation import accuracy, AverageMeter, final_preds
 from pose.utils.misc import save_checkpoint, save_pred, adjust_learning_rate
 from pose.utils.osutils import mkdir_p, isfile, isdir, join
@@ -89,8 +89,9 @@ def main(args):
         save_pred(predictions, checkpoint=args.checkpoint)
         return
 
+    lr = args.lr
     for epoch in range(args.start_epoch, args.epochs):
-        lr = adjust_learning_rate(optimizer, epoch, args.lr)
+        lr = adjust_learning_rate(optimizer, epoch, lr, args.schedule, args.gamma)
         print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr)) 
 
         # train for one epoch
@@ -300,6 +301,10 @@ if __name__ == '__main__':
                         help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=0, type=float,
                         metavar='W', help='weight decay (default: 0)')
+    parser.add_argument('--schedule', type=int, nargs='+', default=[60, 90],
+                        help='Decrease learning rate at these epochs.')
+    parser.add_argument('--gamma', type=float, default=0.1,
+                        help='LR is multiplied by gamma on schedule.')
     parser.add_argument('--print-freq', '-p', default=10, type=int,
                         metavar='N', help='print frequency (default: 10)')
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
