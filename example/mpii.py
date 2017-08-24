@@ -136,10 +136,8 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        inputs = inputs.cuda()
-        target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(inputs)
-        target_var = torch.autograd.Variable(target)
+        input_var = torch.autograd.Variable(inputs.cuda())
+        target_var = torch.autograd.Variable(target.cuda(async=True))
 
         # compute output
         output = model(input_var)
@@ -148,11 +146,11 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
         loss = criterion(output[0], target_var)
         for j in range(1, len(output)):
             loss += criterion(output[j], target_var)
-        acc = accuracy(score_map.cuda(), target, idx)
+        acc = accuracy(score_map, target, idx)
 
         if debug: # visualize groundtruth and predictions
             gt_batch_img = batch_with_heatmap(inputs, target)
-            pred_batch_img = batch_with_heatmap(inputs, output[-1].data)
+            pred_batch_img = batch_with_heatmap(inputs, score_map)
             if not gt_win or not pred_win:
                 ax1 = plt.subplot(121)
                 ax1.title.set_text('Groundtruth')
@@ -233,7 +231,7 @@ def validate(val_loader, model, criterion, debug=False, flip=True):
         loss = 0
         for o in output:
             loss += criterion(o, target_var)
-        acc = accuracy(score_map.cuda(), target, idx)
+        acc = accuracy(score_map, target.cpu(), idx)
 
         # generate predictions
         preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
