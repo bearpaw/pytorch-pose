@@ -7,6 +7,7 @@ data/mpii/images
 *.json
 *debug*
 *.idea/*
+test_transforms.py
 
 __pycache__/
 *.py[cod]

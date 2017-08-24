@@ -18,7 +18,7 @@ pa = [2, 3, 7, 7, 4, 5, 8, 9, 10, 0, 12, 13, 8, 8, 14, 15];
 load('data/detections_our_format.mat', 'dataset_joints', 'jnt_missing', 'pos_pred_src', 'pos_gt_src', 'headboxes_src');
 
 % predictions
-predfile = '/home/wyang/code/pose/pytorch-pose/checkpoint/mpii/hg4/preds_valid.mat';
+predfile = '/home/wyang/code/pose/pytorch-pose/checkpoint/mpii/hg_s2_b1_mean/preds_valid.mat';
 preds = load(predfile,'preds');
 pos_pred_src = permute(preds.preds, [2, 3, 1]);   
 

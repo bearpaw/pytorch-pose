@@ -73,9 +73,10 @@ class Mpii(data.Dataset):
 
         img_path = os.path.join(self.img_folder, a['img_paths'])
         pts = torch.Tensor(a['joint_self'])
-        pts[:, 0:2] -= 1  # Convert pts to zero based
+        # pts[:, 0:2] -= 1  # Convert pts to zero based
 
-        c = torch.Tensor(a['objpos']) - 1
+        # c = torch.Tensor(a['objpos']) - 1
+        c = torch.Tensor(a['objpos'])
         s = a['scale_provided']
 
         # Adjust center/scale slightly to avoid cropping limbs
@@ -90,7 +91,7 @@ class Mpii(data.Dataset):
         r = 0
         if self.is_train:
             s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf, 1+sf)[0]
-            r = torch.randn(1).mul_(rf).clamp(-2*rf, 2*rf)[0] if random.random() <= 0.9 else 0
+            r = torch.randn(1).mul_(rf).clamp(-2*rf, 2*rf)[0] if random.random() <= 0.6 else 0
 
             # Flip
             if random.random() <= 0.5:
