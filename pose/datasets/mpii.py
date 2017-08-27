@@ -112,9 +112,10 @@ class Mpii(data.Dataset):
         tpts = pts.clone()
         target = torch.zeros(nparts, self.out_res, self.out_res)
         for i in range(nparts):
-            if tpts[i, 2] > 0:
-                tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2], c, s, [self.out_res, self.out_res], rot=r))
-                target[i] = draw_gaussian(target[i], tpts[i], self.sigma)
+            # if tpts[i, 2] > 0: # This is evil!!
+            if tpts[i, 0] > 0:
+                tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2]+1, c, s, [self.out_res, self.out_res], rot=r))
+                target[i] = draw_gaussian(target[i], tpts[i]-1, self.sigma)
 
         # Meta info
         meta = {'index' : index, 'center' : c, 'scale' : s, 

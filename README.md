@@ -4,16 +4,6 @@ PyTorch-Pose is a PyTorch implementation of the general pipeline for 2D single h
 
 Some codes for data preparation and augmentation are brought from the [Stacked hourglass network](https://github.com/anewell/pose-hg-train). Thanks to the original author. 
 
-**Table of Contents**  
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-   - [Testing](#testing)
-      - [Evaluate the PCKh@0.5 score](#evaluate-the-pckh05-score)
-   - [Training](#training)
-- [To Do List](#to-do-list)
-- [Contribute](#contribute)
-
 ## Features
 - Multi-thread data loading
 - Multi-GPU training
@@ -36,11 +26,11 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
 ## Usage
 
 ### Testing
-You may download our pretrained [4-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing) for a quick start.
+You may download our pretrained [2-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing) for a quick start.
 
 Run the following command in terminal to evaluate the model on MPII validation split (The train/val split is from [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip)).
 ```
-CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg --stacks 4 --blocks 2 --checkpoint checkpoint/mpii/hg4 --resume checkpoint/mpii/hg4/model_best.pth.tar -e -d
+CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg --stacks 2 --blocks 1 --checkpoint checkpoint/mpii/hg_s2_b1 --resume checkpoint/mpii/hg_s2_b1/model_best.pth.tar -e -d
 ```
 * `-a` specifies a network architecture
 * `--resume` will load the weight from a specific model
@@ -55,13 +45,17 @@ The result will be saved as a `.mat` file (`preds_valid.mat`), which is a `2958x
 
 You may use the matlab script `evaluation/eval_PCKh.m` to evaluate your predictions. The evaluation code is ported from  [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip).
 
-The result (PCKh@0.5 score) of the [4-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing) trained using this code is reported in the following table.
+The result (PCKh@0.5 score) of the [2-stack hourglass model (`stack=2, block=1`)](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing) trained using this code is reported in the following table.
 
 
-| Model    | Head | Shoulder | Elbow | Wrist | Hip  | Knee  | Ankle | Mean | 
-| -------- | -----| -------- | ----- | ----- | ---- | ------|------ | ---- |
-| hg4      | 96.28| 92.34    | 82.60 | 78.10 | 83.42| 77.96 | 73.62 | 83.58|
+| Model            | Head | Shoulder | Elbow | Wrist | Hip  | Knee  | Ankle | Mean | 
+| ---------------- | -----| -------- | ----- | ----- | ---- | ------|------ | ---- |
+| hg_s2_b1 (last)  | 95.80| 94.57    | 88.12 | 83.31 | 86.24| 80.88 | 77.44 | 86.76|
+| hg_s2_b1 (best)  | 95.87| 94.68    | 88.27 | 83.64 | 86.29| 81.20 | 77.70 | 86.95|
 
+Training / validation curve is visualized as follows.
+
+![curve](data/curve.png)
 ##### Evaluate with Python
 
 You may also evaluate the result by running `python evaluation/eval_PCKh.py` to evaluate the predictions. It will produce exactly the same result as that of the MATLAB. Thanks [@sssruhan1](https://github.com/sssruhan1) for the [contribution](https://github.com/bearpaw/pytorch-pose/pull/2).

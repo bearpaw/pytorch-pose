@@ -196,6 +196,7 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
 
 def validate(val_loader, model, criterion, debug=False, flip=True):
     batch_time = AverageMeter()
+    data_time = AverageMeter()
     losses = AverageMeter()
     acces = AverageMeter()
 
@@ -208,7 +209,10 @@ def validate(val_loader, model, criterion, debug=False, flip=True):
     gt_win, pred_win = None, None
     end = time.time()
     bar = Bar('Processing', max=len(val_loader))
-    for i, (inputs, target, meta) in enumerate(val_loader): 
+    for i, (inputs, target, meta) in enumerate(val_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
         target = target.cuda(async=True)
 
         input_var = torch.autograd.Variable(inputs.cuda(), volatile=True)
@@ -262,9 +266,10 @@ def validate(val_loader, model, criterion, debug=False, flip=True):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
+        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
                     batch=i + 1,
                     size=len(val_loader),
+                    data=data_time.val,
                     bt=batch_time.avg,
                     total=bar.elapsed_td,
                     eta=bar.eta_td,
