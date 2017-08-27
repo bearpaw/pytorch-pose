@@ -55,7 +55,7 @@ The result (PCKh@0.5 score) of the [2-stack hourglass model (`stack=2, block=1`)
 
 Training / validation curve is visualized as follows.
 
-![curve](data/curve.png)
+![curve](data/acc_curve.png)
 ##### Evaluate with Python
 
 You may also evaluate the result by running `python evaluation/eval_PCKh.py` to evaluate the predictions. It will produce exactly the same result as that of the MATLAB. Thanks [@sssruhan1](https://github.com/sssruhan1) for the [contribution](https://github.com/bearpaw/pytorch-pose/pull/2).
