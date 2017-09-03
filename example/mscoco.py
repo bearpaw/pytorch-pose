@@ -24,7 +24,8 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 
-idx = [1,2,3,4,5,6,11,12,15,16]
+# idx = [1,2,3,4,5,6,11,12,15,16]
+idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
 
 best_acc = 0
 
@@ -38,7 +39,7 @@ def main(args):
 
     # create model
     print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
-    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=16)
+    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=17)
 
     model = torch.nn.DataParallel(model).cuda()
 
@@ -51,7 +52,7 @@ def main(args):
                                 weight_decay=args.weight_decay)
 
     # optionally resume from a checkpoint
-    title = 'mpii-' + args.arch
+    title = 'MSCOCO-' + args.arch
     if args.resume:
         if isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
@@ -74,12 +75,12 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images'),
+        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/train2014', sigma=args.sigma),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', train=False),
+        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/val2014', sigma=args.sigma, train=False),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
@@ -112,7 +113,7 @@ def main(args):
             'state_dict': model.state_dict(),
             'best_acc': best_acc,
             'optimizer' : optimizer.state_dict(),
-        }, predictions, is_best, checkpoint=args.checkpoint)
+        }, predictions, is_best, checkpoint=args.checkpoint, snapshot=args.snapshot)
 
     logger.close()
     logger.plot()
@@ -201,7 +202,7 @@ def validate(val_loader, model, criterion, debug=False, flip=True):
     acces = AverageMeter()
 
     # predictions
-    predictions = torch.Tensor(val_loader.dataset.__len__(), 16, 2)
+    predictions = torch.Tensor(val_loader.dataset.__len__(), 17, 2)
 
     # switch to evaluate mode
     model.eval()
@@ -254,7 +255,7 @@ def validate(val_loader, model, criterion, debug=False, flip=True):
             else:
                 gt_win.set_data(gt_batch_img)
                 pred_win.set_data(pred_batch_img)
-            plt.pause(.05)
+            plt.pause(.5)
             plt.draw()
 
         # measure accuracy and record loss
@@ -294,6 +295,8 @@ if __name__ == '__main__':
                         help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
+    parser.add_argument('--snapshot', default=0, type=int, metavar='N',
+                        help='How often to take a snapshot of the model (0 = never)')
     parser.add_argument('--train-batch', default=6, type=int, metavar='N',
                         help='train batchsize')
     parser.add_argument('--test-batch', default=6, type=int, metavar='N',
@@ -308,6 +311,8 @@ if __name__ == '__main__':
                         help='Decrease learning rate at these epochs.')
     parser.add_argument('--gamma', type=float, default=0.1,
                         help='LR is multiplied by gamma on schedule.')
+    parser.add_argument('--sigma', type=float, default=1,
+                        help='Sigma to generate Gaussian groundtruth map.')
     parser.add_argument('--print-freq', '-p', default=10, type=int,
                         metavar='N', help='print frequency (default: 10)')
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',

@@ -9,6 +9,9 @@ data/mpii/images
 *.idea/*
 test_transforms.py
 experiments
+data/mscoco/coco
+data/mscoco/keypoint
+*.m~
 
 __pycache__/
 *.py[cod]

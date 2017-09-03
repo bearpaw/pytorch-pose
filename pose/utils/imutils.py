@@ -21,7 +21,7 @@ def im_to_torch(img):
 
 def load_image(img_path):
     # H x W x C => C x H x W
-    return im_to_torch(scipy.misc.imread(img_path))
+    return im_to_torch(scipy.misc.imread(img_path, mode='RGB'))
 
 def resize(img, owidth, oheight):
     img = im_to_numpy(img)
