@@ -283,7 +283,7 @@ def validate(val_loader, model, criterion, debug=False, flip=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-    parser.add_argument('--arch', '-a', metavar='ARCH', default='hg8',
+    parser.add_argument('--arch', '-a', metavar='ARCH', default='hg',
                         choices=model_names,
                         help='model architecture: ' +
                             ' | '.join(model_names) +
