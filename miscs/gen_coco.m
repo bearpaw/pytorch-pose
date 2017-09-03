@@ -64,9 +64,12 @@ for isv = trainval
         meanArea = meanArea + a.area;
         
         scale = cocoScale(x, y, v);
-        if scale == -1 % connot compute scale
+%         if scale == -1 % connot compute scale
+        if scale <= 0 % connot compute scale
           continue;
         end
+        
+        assert(scale ~= 0);
         personCnt = personCnt + 1;
         
         % write to json
