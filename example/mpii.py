@@ -74,12 +74,12 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images'),
+        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', sigma=args.sigma),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', train=False),
+        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', sigma=args.sigma, train=False),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
@@ -92,7 +92,12 @@ def main(args):
     lr = args.lr
     for epoch in range(args.start_epoch, args.epochs):
         lr = adjust_learning_rate(optimizer, epoch, lr, args.schedule, args.gamma)
-        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr)) 
+        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr))
+
+        # decay sigma
+        if args.sigma_decay > 0:
+            train_loader.dataset.sigma *=  args.sigma_decay
+            val_loader.dataset.sigma *=  args.sigma_decay
 
         # train for one epoch
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
@@ -283,11 +288,19 @@ def validate(val_loader, model, criterion, debug=False, flip=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+    # Model structure
     parser.add_argument('--arch', '-a', metavar='ARCH', default='hg',
                         choices=model_names,
                         help='model architecture: ' +
                             ' | '.join(model_names) +
                             ' (default: resnet18)')
+    parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
+                        help='Number of hourglasses to stack')
+    parser.add_argument('--features', default=256, type=int, metavar='N',
+                        help='Number of features in the hourglass')
+    parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
+                        help='Number of residual modules at each location in the hourglass')
+    # Training strategy
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
@@ -308,8 +321,14 @@ if __name__ == '__main__':
                         help='Decrease learning rate at these epochs.')
     parser.add_argument('--gamma', type=float, default=0.1,
                         help='LR is multiplied by gamma on schedule.')
-    parser.add_argument('--print-freq', '-p', default=10, type=int,
-                        metavar='N', help='print frequency (default: 10)')
+    # Data processing
+    parser.add_argument('-f', '--flip', dest='flip', action='store_true',
+                        help='flip the input during validation')
+    parser.add_argument('--sigma', type=float, default=1,
+                        help='Groundtruth Gaussian sigma.')
+    parser.add_argument('--sigma-decay', type=float, default=0,
+                        help='Sigma decay rate for each epoch.')
+    # Miscs
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
                         help='path to save checkpoint (default: checkpoint)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -318,15 +337,6 @@ if __name__ == '__main__':
                         help='evaluate model on validation set')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help='show intermediate results')
-    parser.add_argument('-f', '--flip', dest='flip', action='store_true',
-                        help='flip the input during validation')
-    # Model structure
-    parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
-                        help='Number of hourglasses to stack')
-    parser.add_argument('--features', default=256, type=int, metavar='N',
-                        help='Number of features in the hourglass')
-    parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
-                        help='Number of residual modules at each location in the hourglass')
 
 
     main(parser.parse_args())
