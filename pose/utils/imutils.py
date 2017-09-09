@@ -49,7 +49,7 @@ def gaussian(shape=(7,7),sigma=1):
     h[ h < np.finfo(h.dtype).eps*h.max() ] = 0
     return to_torch(h).float()
 
-def draw_gaussian(img, pt, sigma):
+def draw_labelmap(img, pt, sigma, type='Gaussian'):
     # Draw a 2D gaussian 
     # Adopted from https://github.com/anewell/pose-hg-train/blob/master/src/pypose/draw.py
     img = to_numpy(img)
@@ -68,7 +68,11 @@ def draw_gaussian(img, pt, sigma):
     y = x[:, np.newaxis]
     x0 = y0 = size // 2
     # The gaussian is not normalized, we want the center value to equal 1
-    g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+    if type == 'Gaussian':
+        g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+    elif type == 'Cauchy':
+        g = sigma / (((x - x0) ** 2 + (y - y0) ** 2 + sigma ** 2) ** 1.5)
+
 
     # Usable gaussian range
     g_x = max(0, -ul[0]), min(br[0], img.shape[1]) - ul[0]

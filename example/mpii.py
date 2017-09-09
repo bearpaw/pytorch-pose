@@ -1,5 +1,6 @@
 from __future__ import print_function, absolute_import
 
+import os
 import argparse
 import time
 import matplotlib.pyplot as plt
@@ -74,12 +75,14 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', sigma=args.sigma),
+        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
+                      sigma=args.sigma, label_type=args.label_type),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images', sigma=args.sigma, train=False),
+        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
+                      sigma=args.sigma, label_type=args.label_type, train=False),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
@@ -328,6 +331,9 @@ if __name__ == '__main__':
                         help='Groundtruth Gaussian sigma.')
     parser.add_argument('--sigma-decay', type=float, default=0,
                         help='Sigma decay rate for each epoch.')
+    parser.add_argument('--label-type', metavar='LABELTYPE', default='Gaussian',
+                        choices=['Gaussian', 'Cauchy'],
+                        help='Labelmap dist type: (default=Gaussian)')
     # Miscs
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
                         help='path to save checkpoint (default: checkpoint)')
