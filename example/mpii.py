@@ -123,7 +123,7 @@ def main(args):
         }, predictions, is_best, checkpoint=args.checkpoint)
 
     logger.close()
-    logger.plot()
+    logger.plot(['Train Acc', 'Val Acc'])
     savefig(os.path.join(args.checkpoint, 'log.eps'))
 
 

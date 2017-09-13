@@ -1,5 +1,6 @@
 from __future__ import print_function, absolute_import
 
+import os
 import argparse
 import time
 import matplotlib.pyplot as plt
@@ -116,7 +117,7 @@ def main(args):
         }, predictions, is_best, checkpoint=args.checkpoint, snapshot=args.snapshot)
 
     logger.close()
-    logger.plot()
+    logger.plot(['Train Acc', 'Val Acc'])
     savefig(os.path.join(args.checkpoint, 'log.eps'))
 
 

@@ -26,7 +26,7 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
 ## Usage
 
 ### Testing
-You may download our pretrained [2-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing) for a quick start.
+You may download our pretrained models (e.g., [2-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing)) for a quick start.
 
 Run the following command in terminal to evaluate the model on MPII validation split (The train/val split is from [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip)).
 ```
@@ -45,13 +45,15 @@ The result will be saved as a `.mat` file (`preds_valid.mat`), which is a `2958x
 
 You may use the matlab script `evaluation/eval_PCKh.m` to evaluate your predictions. The evaluation code is ported from  [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip).
 
-The result (PCKh@0.5 score) of the [2-stack hourglass model (`stack=2, block=1`)](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing) trained using this code is reported in the following table.
+The results (PCKh@0.5 score) trained using this code is reported in the following table.
 
 
 | Model            | Head | Shoulder | Elbow | Wrist | Hip  | Knee  | Ankle | Mean | 
 | ---------------- | -----| -------- | ----- | ----- | ---- | ------|------ | ---- |
 | hg_s2_b1 (last)  | 95.80| 94.57    | 88.12 | 83.31 | 86.24| 80.88 | 77.44 | 86.76|
 | hg_s2_b1 (best)  | 95.87| 94.68    | 88.27 | 83.64 | 86.29| 81.20 | 77.70 | 86.95|
+| hg_s8_b1 (last)  | 96.79| 95.19    | 90.08 | 85.32 | 87.48| 84.26 | 80.73 | 88.64|
+| hg_s8_b1 (best)  | 96.79|	95.28	 | 90.27 | 85.56 | 87.57| 84.3  | 81.06	| 88.78|
 
 Training / validation curve is visualized as follows.
 
