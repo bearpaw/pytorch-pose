@@ -135,7 +135,7 @@ def sample_with_heatmap(inp, out, num_rows=2, parts_to_show=None):
     out = to_numpy(out)
 
     img = np.zeros((inp.shape[1], inp.shape[2], inp.shape[0]))
-    for i in xrange(3):
+    for i in range(3):
         img[:, :, i] = inp[i, :, :]
 
     if parts_to_show is None:
@@ -143,7 +143,7 @@ def sample_with_heatmap(inp, out, num_rows=2, parts_to_show=None):
 
     # Generate a single image to display input/output pair
     num_cols = int(np.ceil(float(len(parts_to_show)) / num_rows))
-    size = img.shape[0] / num_rows
+    size = img.shape[0] // num_rows
 
     full_img = np.zeros((img.shape[0], size * (num_cols + num_rows), 3), np.uint8)
     full_img[:img.shape[0], :img.shape[1]] = img

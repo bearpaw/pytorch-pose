@@ -83,6 +83,7 @@ def final_preds(output, center, scale, res):
             if px > 1 and px < res[0] and py > 1 and py < res[1]:
                 diff = torch.Tensor([hm[py - 1][px] - hm[py - 1][px - 2], hm[py][px - 1]-hm[py - 2][px - 1]])
                 coords[n][p] += diff.sign() * .25
+    coords += 0.5
     preds = coords.clone()
 
     # Transform back
