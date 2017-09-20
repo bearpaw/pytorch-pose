@@ -25,7 +25,6 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 
-# idx = [1,2,3,4,5,6,11,12,15,16]
 idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
 
 best_acc = 0
@@ -40,7 +39,7 @@ def main(args):
 
     # create model
     print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
-    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=17)
+    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=args.num_classes)
 
     model = torch.nn.DataParallel(model).cuda()
 
@@ -76,18 +75,20 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/train2014', sigma=args.sigma),
+        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/train2014',
+                        sigma=args.sigma, label_type=args.label_type),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/val2014', sigma=args.sigma, train=False),
+        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/val2014',
+                        sigma=args.sigma, label_type=args.label_type, train=False),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
         print('\nEvaluation only') 
-        loss, acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
+        loss, acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
         save_pred(predictions, checkpoint=args.checkpoint)
         return
 
@@ -100,7 +101,7 @@ def main(args):
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
 
         # evaluate on validation set
-        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
+        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
 
         # append logger file
         logger.append([epoch + 1, lr, train_loss, valid_loss, train_acc, valid_acc])
@@ -196,14 +197,14 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
     return losses.avg, acces.avg
 
 
-def validate(val_loader, model, criterion, debug=False, flip=True):
+def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     acces = AverageMeter()
 
     # predictions
-    predictions = torch.Tensor(val_loader.dataset.__len__(), 17, 2)
+    predictions = torch.Tensor(val_loader.dataset.__len__(), num_classes, 2)
 
     # switch to evaluate mode
     model.eval()
@@ -290,6 +291,8 @@ if __name__ == '__main__':
                         help='model architecture: ' +
                             ' | '.join(model_names) +
                             ' (default: resnet18)')
+    parser.add_argument('--num-classes', default=17, type=int, metavar='N',
+                        help='Number of keypoints')
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
@@ -314,6 +317,9 @@ if __name__ == '__main__':
                         help='LR is multiplied by gamma on schedule.')
     parser.add_argument('--sigma', type=float, default=1,
                         help='Sigma to generate Gaussian groundtruth map.')
+    parser.add_argument('--label-type', metavar='LABELTYPE', default='Gaussian',
+                        choices=['Gaussian', 'Cauchy'],
+                        help='Labelmap dist type: (default=Gaussian)')
     parser.add_argument('--print-freq', '-p', default=10, type=int,
                         metavar='N', help='print frequency (default: 10)')
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',

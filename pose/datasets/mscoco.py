@@ -16,7 +16,7 @@ from pose.utils.transforms import *
 
 class Mscoco(data.Dataset):
     def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, sigma=1,
-                 scale_factor=0.25, rot_factor=30):
+                 scale_factor=0.25, rot_factor=30, label_type='Gaussian'):
         self.img_folder = img_folder    # root image folders
         self.is_train = train           # training set or test set
         self.inp_res = inp_res
@@ -24,6 +24,7 @@ class Mscoco(data.Dataset):
         self.sigma = sigma
         self.scale_factor = scale_factor
         self.rot_factor = rot_factor
+        self.label_type = label_type
 
         # create train/val split
         with open(jsonfile) as anno_file:   
@@ -117,9 +118,8 @@ class Mscoco(data.Dataset):
         target = torch.zeros(nparts, self.out_res, self.out_res)
         for i in range(nparts):
             if tpts[i, 2] > 0: # COCO visible: 0-no label, 1-label + invisible, 2-label + visible
-            # if tpts[i, 0] > 0:
                 tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2]+1, c, s, [self.out_res, self.out_res], rot=r))
-                target[i] = draw_gaussian(target[i], tpts[i]-1, self.sigma)
+                target[i] = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
 
         # Meta info
         meta = {'index' : index, 'center' : c, 'scale' : s, 

@@ -39,7 +39,7 @@ def main(args):
 
     # create model
     print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
-    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=16)
+    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=args.num_classes)
 
     model = torch.nn.DataParallel(model).cuda()
 
@@ -88,7 +88,7 @@ def main(args):
 
     if args.evaluate:
         print('\nEvaluation only') 
-        loss, acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
+        loss, acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
         save_pred(predictions, checkpoint=args.checkpoint)
         return
 
@@ -106,7 +106,8 @@ def main(args):
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
 
         # evaluate on validation set
-        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.debug, args.flip)
+        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.num_classes,
+                                                      args.debug, args.flip)
 
         # append logger file
         logger.append([epoch + 1, lr, train_loss, valid_loss, train_acc, valid_acc])
@@ -202,14 +203,14 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
     return losses.avg, acces.avg
 
 
-def validate(val_loader, model, criterion, debug=False, flip=True):
+def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     acces = AverageMeter()
 
     # predictions
-    predictions = torch.Tensor(val_loader.dataset.__len__(), 16, 2)
+    predictions = torch.Tensor(val_loader.dataset.__len__(), num_classes, 2)
 
     # switch to evaluate mode
     model.eval()
@@ -303,6 +304,8 @@ if __name__ == '__main__':
                         help='Number of features in the hourglass')
     parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
                         help='Number of residual modules at each location in the hourglass')
+    parser.add_argument('--num-classes', default=16, type=int, metavar='N',
+                        help='Number of keypoints')
     # Training strategy
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
