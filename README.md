@@ -76,9 +76,10 @@ Please refer to the `example/mpii.py` for the supported options/arguments.
 
 ## To Do List
 Supported dataset
-- [x] MPII human pose
+- [x] [MPII human pose](http://human-pose.mpi-inf.mpg.de)
+- [x] [Leeds Sports Pose (LSP)](http://sam.johnson.io/research/lsp.html)
+- [x] [MSCOCO (single person)](http://cocodataset.org/#keypoints-challenge2017)
 - [ ] FLIC
-- [ ] LSP
 
 Supported models
 - [x] [Stacked Hourglass networks](https://arxiv.org/abs/1603.06937)
