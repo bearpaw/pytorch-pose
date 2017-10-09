@@ -23,7 +23,7 @@ def get_preds(scores):
     preds = idx.repeat(1, 1, 2).float()
 
     preds[:,:,0] = (preds[:,:,0] - 1) % scores.size(3) + 1
-    preds[:,:,1] = torch.floor((preds[:,:,1] - 1) / scores.size(2)) + 1
+    preds[:,:,1] = torch.floor((preds[:,:,1] - 1) / scores.size(3)) + 1
 
     pred_mask = maxval.gt(0).repeat(1, 1, 2).float()
     preds *= pred_mask
