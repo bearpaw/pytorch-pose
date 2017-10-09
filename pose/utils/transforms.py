@@ -12,7 +12,7 @@ from .imutils import *
 
 def color_normalize(x, mean, std):
     if x.size(0) == 1:
-        x = x.repeat(3, x.size(1), x.size(2))
+        x = x.repeat(3, 1, 1)
 
     for t, m, s in zip(x, mean, std):
         t.sub_(m)
