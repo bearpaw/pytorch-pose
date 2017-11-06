@@ -15,6 +15,7 @@ data/mscoco/keypoint
 miscs/posetrack
 miscs/h36m
 data/h36m
+.ftpconfig
 
 __pycache__/
 *.py[cod]

@@ -1,54 +1,14 @@
 '''
-Hourglass network inserted in the pre-activated Resnet 
+Hourglass network inserted in the pre-activated Resnet
 Use lr=0.01 for current version
-(c) YANG, Wei 
+(c) YANG, Wei
 '''
 import torch.nn as nn
 import torch.nn.functional as F
-
-# from .preresnet import BasicBlock, Bottleneck
+from .modules import Bottleneck, PyramidResidual
 
 
 __all__ = ['HourglassNet', 'hg']
-
-class Bottleneck(nn.Module):
-    expansion = 2
-
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
-        super(Bottleneck, self).__init__()
-
-        self.bn1 = nn.BatchNorm2d(inplanes)
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=True)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                               padding=1, bias=True)
-        self.bn3 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, planes * 2, kernel_size=1, bias=True)
-        self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.bn1(x)
-        out = self.relu(out)
-        out = self.conv1(out)
-
-        out = self.bn2(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-
-        out = self.bn3(out)
-        out = self.relu(out)
-        out = self.conv3(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-
-        return out
 
 
 class Hourglass(nn.Module):
@@ -104,7 +64,7 @@ class HourglassNet(nn.Module):
         self.num_stacks = num_stacks
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=True)
-        self.bn1 = nn.BatchNorm2d(self.inplanes) 
+        self.bn1 = nn.BatchNorm2d(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_residual(block, self.inplanes, 1)
         self.layer2 = self._make_residual(block, self.inplanes, 1)
@@ -126,7 +86,7 @@ class HourglassNet(nn.Module):
         self.res = nn.ModuleList(res)
         self.fc = nn.ModuleList(fc)
         self.score = nn.ModuleList(score)
-        self.fc_ = nn.ModuleList(fc_) 
+        self.fc_ = nn.ModuleList(fc_)
         self.score_ = nn.ModuleList(score_)
 
     def _make_residual(self, block, planes, blocks, stride=1):
@@ -158,12 +118,12 @@ class HourglassNet(nn.Module):
         out = []
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x) 
+        x = self.relu(x)
 
-        x = self.layer1(x)  
+        x = self.layer1(x)
         x = self.maxpool(x)
-        x = self.layer2(x)  
-        x = self.layer3(x)  
+        x = self.layer2(x)
+        x = self.layer3(x)
 
         for i in range(self.num_stacks):
             y = self.hg[i](x)
