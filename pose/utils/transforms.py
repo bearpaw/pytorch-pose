@@ -128,6 +128,22 @@ def transform_preds(coords, center, scale, res):
 def crop(img, center, scale, res, rot=0):
     img = im_to_numpy(img)
 
+    # Preprocessing for efficient cropping
+    ht, wd = img.shape[0], img.shape[1]
+    sf = scale * 200.0 / res[0]
+    if sf < 2:
+        sf = 1
+    else:
+        new_size = int(np.math.floor(max(ht, wd) / sf))
+        new_ht = int(np.math.floor(ht / sf))
+        new_wd = int(np.math.floor(wd / sf))
+        if new_size < 2:
+            return torch.zeros(3, res[0], res[1])
+        else:
+            img = scipy.misc.imresize(img, [new_ht, new_wd])
+            center = center * 1.0 / sf
+            scale = scale / sf
+
     # Upper left point
     ul = np.array(transform([0, 0], center, scale, res, invert=1))
     # Bottom right point
