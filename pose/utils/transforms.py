@@ -138,7 +138,8 @@ def crop(img, center, scale, res, rot=0):
         new_ht = int(np.math.floor(ht / sf))
         new_wd = int(np.math.floor(wd / sf))
         if new_size < 2:
-            return torch.zeros(3, res[0], res[1])
+            return torch.zeros(res[0], res[1], img.shape[2]) \
+                        if len(img.shape) > 2 else torch.zeros(res[0], res[1])
         else:
             img = scipy.misc.imresize(img, [new_ht, new_wd])
             center = center * 1.0 / sf
