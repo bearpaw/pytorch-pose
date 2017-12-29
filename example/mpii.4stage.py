@@ -24,7 +24,7 @@ import pose.datasets as datasets
 
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 
 model_names = sorted(name for name in models.__dict__
@@ -304,8 +304,12 @@ if __name__ == '__main__':
                         help='model architecture: ' +
                             ' | '.join(model_names) +
                             ' (default: resnet18)')
-    parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
+    parser.add_argument('-s', '--stacks', default=4, type=int, metavar='N',
                         help='Number of hourglasses to stack')
+    parser.add_argument('-c', '--checkpoint', default='checkpoint/mpii/hg4', type=str, metavar='PATH',
+                        help='path to save checkpoint (default: checkpoint)')
+
+
     parser.add_argument('--features', default=256, type=int, metavar='N',
                         help='Number of features in the hourglass')
     parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
@@ -344,8 +348,6 @@ if __name__ == '__main__':
                         choices=['Gaussian', 'Cauchy'],
                         help='Labelmap dist type: (default=Gaussian)')
     # Miscs
-    parser.add_argument('-c', '--checkpoint', default='checkpoint/mpii/hg8', type=str, metavar='PATH',
-                        help='path to save checkpoint (default: checkpoint)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',

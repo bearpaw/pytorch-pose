@@ -21,10 +21,11 @@ from pose.utils.imutils import batch_with_heatmap
 from pose.utils.transforms import fliplr, flip_back
 import pose.models as models
 import pose.datasets as datasets
+from pose.loss.myloss import HSM
 
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 
 model_names = sorted(name for name in models.__dict__
@@ -50,7 +51,9 @@ def main(args):
     model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = torch.nn.MSELoss(size_average=True).cuda()
+    #criterion = torch.nn.MSELoss(size_average=True).cuda()
+
+    criterion = HSM(beta=1,gamma=2).cuda()
 
     optimizer = torch.optim.RMSprop(model.parameters(), 
                                 lr=args.lr,
@@ -304,8 +307,12 @@ if __name__ == '__main__':
                         help='model architecture: ' +
                             ' | '.join(model_names) +
                             ' (default: resnet18)')
-    parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
+    parser.add_argument('-s', '--stacks', default=4, type=int, metavar='N',
                         help='Number of hourglasses to stack')
+    parser.add_argument('-c', '--checkpoint', default='checkpoint/mpii/hg4.hsm', type=str, metavar='PATH',
+                        help='path to save checkpoint (default: checkpoint)')
+
+
     parser.add_argument('--features', default=256, type=int, metavar='N',
                         help='Number of features in the hourglass')
     parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
@@ -344,8 +351,6 @@ if __name__ == '__main__':
                         choices=['Gaussian', 'Cauchy'],
                         help='Labelmap dist type: (default=Gaussian)')
     # Miscs
-    parser.add_argument('-c', '--checkpoint', default='checkpoint/mpii/hg8', type=str, metavar='PATH',
-                        help='path to save checkpoint (default: checkpoint)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
