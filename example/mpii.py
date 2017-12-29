@@ -1,6 +1,6 @@
 from __future__ import print_function, absolute_import
 
-import os
+import os,sys
 import argparse
 import time
 import matplotlib.pyplot as plt
@@ -11,6 +11,7 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torchvision.datasets as datasets
 
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from pose import Bar
 from pose.utils.logger import Logger, savefig
 from pose.utils.evaluation import accuracy, AverageMeter, final_preds
