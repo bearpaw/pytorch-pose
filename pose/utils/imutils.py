@@ -21,7 +21,7 @@ def im_to_torch(img):
 
 def load_image(img_path):
     # H x W x C => C x H x W
-    return im_to_torch(scipy.misc.imread(img_path))/255  
+    return im_to_torch(scipy.misc.imread(img_path, mode='RGB'))
 
 def resize(img, owidth, oheight):
     img = im_to_numpy(img)
@@ -49,7 +49,7 @@ def gaussian(shape=(7,7),sigma=1):
     h[ h < np.finfo(h.dtype).eps*h.max() ] = 0
     return to_torch(h).float()
 
-def draw_gaussian(img, pt, sigma):
+def draw_labelmap(img, pt, sigma, type='Gaussian'):
     # Draw a 2D gaussian 
     # Adopted from https://github.com/anewell/pose-hg-train/blob/master/src/pypose/draw.py
     img = to_numpy(img)
@@ -68,7 +68,11 @@ def draw_gaussian(img, pt, sigma):
     y = x[:, np.newaxis]
     x0 = y0 = size // 2
     # The gaussian is not normalized, we want the center value to equal 1
-    g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+    if type == 'Gaussian':
+        g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+    elif type == 'Cauchy':
+        g = sigma / (((x - x0) ** 2 + (y - y0) ** 2 + sigma ** 2) ** 1.5)
+
 
     # Usable gaussian range
     g_x = max(0, -ul[0]), min(br[0], img.shape[1]) - ul[0]
@@ -131,15 +135,15 @@ def sample_with_heatmap(inp, out, num_rows=2, parts_to_show=None):
     out = to_numpy(out)
 
     img = np.zeros((inp.shape[1], inp.shape[2], inp.shape[0]))
-    for i in xrange(3):
+    for i in range(3):
         img[:, :, i] = inp[i, :, :]
 
     if parts_to_show is None:
         parts_to_show = np.arange(out.shape[0])
 
     # Generate a single image to display input/output pair
-    num_cols = np.ceil(float(len(parts_to_show)) / num_rows)
-    size = img.shape[0] / num_rows
+    num_cols = int(np.ceil(float(len(parts_to_show)) / num_rows))
+    size = img.shape[0] // num_rows
 
     full_img = np.zeros((img.shape[0], size * (num_cols + num_rows), 3), np.uint8)
     full_img[:img.shape[0], :img.shape[1]] = img

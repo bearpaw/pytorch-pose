@@ -14,7 +14,15 @@ from pose.utils.imutils import *
 from pose.utils.transforms import *
 
 
-class Mpii(data.Dataset):
+class LSP(data.Dataset):
+    """
+    LSP extended dataset (11,000 train, 1000 test)
+    Original datasets contain 14 keypoints. We interpolate mid-hip and mid-shoulder and change the indices to match
+    the MPII dataset (16 keypoints).
+
+    Wei Yang (bearpaw@GitHub)
+    2017-09-28
+    """
     def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, sigma=1,
                  scale_factor=0.25, rot_factor=30, label_type='Gaussian'):
         self.img_folder = img_folder    # root image folders
@@ -39,7 +47,7 @@ class Mpii(data.Dataset):
         self.mean, self.std = self._compute_mean()
 
     def _compute_mean(self):
-        meanstd_file = './data/mpii/mean.pth.tar'
+        meanstd_file = './data/lsp/mean.pth.tar'
         if isfile(meanstd_file):
             meanstd = torch.load(meanstd_file)
         else:
@@ -82,28 +90,28 @@ class Mpii(data.Dataset):
 
         # Adjust center/scale slightly to avoid cropping limbs
         if c[0] != -1:
-            c[1] = c[1] + 15 * s
-            s = s * 1.25
+            # c[1] = c[1] + 15 * s
+            s = s * 1.4375
 
         # For single-person pose estimation with a centered/scaled figure
         nparts = pts.size(0)
         img = load_image(img_path)  # CxHxW
 
         r = 0
-        if self.is_train:
-            s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf, 1+sf)[0]
-            r = torch.randn(1).mul_(rf).clamp(-2*rf, 2*rf)[0] if random.random() <= 0.6 else 0
-
-            # Flip
-            if random.random() <= 0.5:
-                img = torch.from_numpy(fliplr(img.numpy())).float()
-                pts = shufflelr(pts, width=img.size(2), dataset='mpii')
-                c[0] = img.size(2) - c[0]
-
-            # Color
-            img[0, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
-            img[1, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
-            img[2, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
+        # if self.is_train:
+        #     s = s*torch.randn(1).mul_(sf).add_(1).clamp(1-sf, 1+sf)[0]
+        #     r = torch.randn(1).mul_(rf).clamp(-2*rf, 2*rf)[0] if random.random() <= 0.6 else 0
+        #
+        #     # # Flip
+        #     # if random.random() <= 0.5:
+        #     #     img = torch.from_numpy(fliplr(img.numpy())).float()
+        #     #     pts = shufflelr(pts, width=img.size(2), dataset='mpii')
+        #     #     c[0] = img.size(2) - c[0]
+        #
+        #     # Color
+        #     img[0, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
+        #     img[1, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
+        #     img[2, :, :].mul_(random.uniform(0.8, 1.2)).clamp_(0, 1)
 
         # Prepare image and groundtruth map
         inp = crop(img, c, s, [self.inp_res, self.inp_res], rot=r)

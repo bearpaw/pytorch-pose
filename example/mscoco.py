@@ -25,7 +25,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 
-idx = [1,2,3,4,5,6,11,12,15,16]
+idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
 
 best_acc = 0
 
@@ -52,7 +52,7 @@ def main(args):
                                 weight_decay=args.weight_decay)
 
     # optionally resume from a checkpoint
-    title = 'mpii-' + args.arch
+    title = 'MSCOCO-' + args.arch
     if args.resume:
         if isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
@@ -75,14 +75,14 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
-                      sigma=args.sigma, label_type=args.label_type),
+        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/train2014',
+                        sigma=args.sigma, label_type=args.label_type),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
-                      sigma=args.sigma, label_type=args.label_type, train=False),
+        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/val2014',
+                        sigma=args.sigma, label_type=args.label_type, train=False),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
@@ -95,19 +95,13 @@ def main(args):
     lr = args.lr
     for epoch in range(args.start_epoch, args.epochs):
         lr = adjust_learning_rate(optimizer, epoch, lr, args.schedule, args.gamma)
-        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr))
-
-        # decay sigma
-        if args.sigma_decay > 0:
-            train_loader.dataset.sigma *=  args.sigma_decay
-            val_loader.dataset.sigma *=  args.sigma_decay
+        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr)) 
 
         # train for one epoch
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
 
         # evaluate on validation set
-        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.num_classes,
-                                                      args.debug, args.flip)
+        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
 
         # append logger file
         logger.append([epoch + 1, lr, train_loss, valid_loss, train_acc, valid_acc])
@@ -121,7 +115,7 @@ def main(args):
             'state_dict': model.state_dict(),
             'best_acc': best_acc,
             'optimizer' : optimizer.state_dict(),
-        }, predictions, is_best, checkpoint=args.checkpoint)
+        }, predictions, is_best, checkpoint=args.checkpoint, snapshot=args.snapshot)
 
     logger.close()
     logger.plot(['Train Acc', 'Val Acc'])
@@ -263,7 +257,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
             else:
                 gt_win.set_data(gt_batch_img)
                 pred_win.set_data(pred_batch_img)
-            plt.pause(.05)
+            plt.pause(.5)
             plt.draw()
 
         # measure accuracy and record loss
@@ -292,27 +286,21 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-    # Model structure
     parser.add_argument('--arch', '-a', metavar='ARCH', default='hg',
                         choices=model_names,
                         help='model architecture: ' +
                             ' | '.join(model_names) +
                             ' (default: resnet18)')
-    parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
-                        help='Number of hourglasses to stack')
-    parser.add_argument('--features', default=256, type=int, metavar='N',
-                        help='Number of features in the hourglass')
-    parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
-                        help='Number of residual modules at each location in the hourglass')
-    parser.add_argument('--num-classes', default=16, type=int, metavar='N',
+    parser.add_argument('--num-classes', default=17, type=int, metavar='N',
                         help='Number of keypoints')
-    # Training strategy
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
+    parser.add_argument('--snapshot', default=0, type=int, metavar='N',
+                        help='How often to take a snapshot of the model (0 = never)')
     parser.add_argument('--train-batch', default=6, type=int, metavar='N',
                         help='train batchsize')
     parser.add_argument('--test-batch', default=6, type=int, metavar='N',
@@ -327,17 +315,13 @@ if __name__ == '__main__':
                         help='Decrease learning rate at these epochs.')
     parser.add_argument('--gamma', type=float, default=0.1,
                         help='LR is multiplied by gamma on schedule.')
-    # Data processing
-    parser.add_argument('-f', '--flip', dest='flip', action='store_true',
-                        help='flip the input during validation')
     parser.add_argument('--sigma', type=float, default=1,
-                        help='Groundtruth Gaussian sigma.')
-    parser.add_argument('--sigma-decay', type=float, default=0,
-                        help='Sigma decay rate for each epoch.')
+                        help='Sigma to generate Gaussian groundtruth map.')
     parser.add_argument('--label-type', metavar='LABELTYPE', default='Gaussian',
                         choices=['Gaussian', 'Cauchy'],
                         help='Labelmap dist type: (default=Gaussian)')
-    # Miscs
+    parser.add_argument('--print-freq', '-p', default=10, type=int,
+                        metavar='N', help='print frequency (default: 10)')
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
                         help='path to save checkpoint (default: checkpoint)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -346,6 +330,15 @@ if __name__ == '__main__':
                         help='evaluate model on validation set')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help='show intermediate results')
+    parser.add_argument('-f', '--flip', dest='flip', action='store_true',
+                        help='flip the input during validation')
+    # Model structure
+    parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
+                        help='Number of hourglasses to stack')
+    parser.add_argument('--features', default=256, type=int, metavar='N',
+                        help='Number of features in the hourglass')
+    parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
+                        help='Number of residual modules at each location in the hourglass')
 
 
     main(parser.parse_args())

@@ -52,7 +52,7 @@ def main(args):
                                 weight_decay=args.weight_decay)
 
     # optionally resume from a checkpoint
-    title = 'mpii-' + args.arch
+    title = 'LSP-' + args.arch
     if args.resume:
         if isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
@@ -75,13 +75,13 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
+        datasets.LSP('data/lsp/LEEDS_annotations.json', 'data/lsp/images',
                       sigma=args.sigma, label_type=args.label_type),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
+        datasets.LSP('data/lsp/LEEDS_annotations.json', 'data/lsp/images',
                       sigma=args.sigma, label_type=args.label_type, train=False),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)

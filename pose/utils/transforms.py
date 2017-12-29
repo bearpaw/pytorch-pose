@@ -9,10 +9,14 @@ import torch
 from .misc import *
 from .imutils import *
 
+
 def color_normalize(x, mean, std):
     if x.size(0) == 1:
-        x = x.repeat(3, x.size(1), x.size(2))
-    return (x - mean.view(3, 1, 1).expand_as(x)) #/ std.view(3, 1, 1).expand_as(x)
+        x = x.repeat(3, 1, 1)
+
+    for t, m, s in zip(x, mean, std):
+        t.sub_(m)
+    return x
 
 
 def flip_back(flip_output, dataset='mpii'):
@@ -37,6 +41,7 @@ def flip_back(flip_output, dataset='mpii'):
         flip_output[:, pair[1], :, :] = tmp
 
     return torch.from_numpy(flip_output).float()
+
 
 def shufflelr(x, width, dataset='mpii'):
     """
@@ -71,10 +76,10 @@ def fliplr(x):
     return x.astype(float)
 
 
-"""
-General image processing functions
-"""
 def get_transform(center, scale, res, rot=0):
+    """
+    General image processing functions
+    """
     # Generate transformation matrix
     h = 200 * scale
     t = np.zeros((3, 3))
@@ -100,14 +105,16 @@ def get_transform(center, scale, res, rot=0):
         t = np.dot(t_inv,np.dot(rot_mat,np.dot(t_mat,t)))
     return t
 
+
 def transform(pt, center, scale, res, invert=0, rot=0):
     # Transform pixel location to different reference
     t = get_transform(center, scale, res, rot=rot)
     if invert:
         t = np.linalg.inv(t)
-    new_pt = np.array([pt[0], pt[1], 1.]).T
+    new_pt = np.array([pt[0] - 1, pt[1] - 1, 1.]).T
     new_pt = np.dot(t, new_pt)
-    return new_pt[:2].astype(int)
+    return new_pt[:2].astype(int) + 1
+
 
 def transform_preds(coords, center, scale, res):
     # size = coords.size()
@@ -117,8 +124,26 @@ def transform_preds(coords, center, scale, res):
         coords[p, 0:2] = to_torch(transform(coords[p, 0:2], center, scale, res, 1, 0))
     return coords
 
+
 def crop(img, center, scale, res, rot=0):
     img = im_to_numpy(img)
+
+    # Preprocessing for efficient cropping
+    ht, wd = img.shape[0], img.shape[1]
+    sf = scale * 200.0 / res[0]
+    if sf < 2:
+        sf = 1
+    else:
+        new_size = int(np.math.floor(max(ht, wd) / sf))
+        new_ht = int(np.math.floor(ht / sf))
+        new_wd = int(np.math.floor(wd / sf))
+        if new_size < 2:
+            return torch.zeros(res[0], res[1], img.shape[2]) \
+                        if len(img.shape) > 2 else torch.zeros(res[0], res[1])
+        else:
+            img = scipy.misc.imresize(img, [new_ht, new_wd])
+            center = center * 1.0 / sf
+            scale = scale / sf
 
     # Upper left point
     ul = np.array(transform([0, 0], center, scale, res, invert=1))

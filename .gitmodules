@@ -1,3 +1,6 @@
 [submodule "pose/progress"]
 	path = pose/progress
 	url = https://github.com/verigak/progress.git
+[submodule "miscs/jsonlab"]
+	path = miscs/jsonlab
+	url = https://github.com/fangq/jsonlab

@@ -14,7 +14,7 @@ from pose.utils.imutils import *
 from pose.utils.transforms import *
 
 
-class Mpii(data.Dataset):
+class Mscoco(data.Dataset):
     def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, sigma=1,
                  scale_factor=0.25, rot_factor=30, label_type='Gaussian'):
         self.img_folder = img_folder    # root image folders
@@ -39,13 +39,17 @@ class Mpii(data.Dataset):
         self.mean, self.std = self._compute_mean()
 
     def _compute_mean(self):
-        meanstd_file = './data/mpii/mean.pth.tar'
+        meanstd_file = './data/mscoco/mean.pth.tar'
         if isfile(meanstd_file):
             meanstd = torch.load(meanstd_file)
         else:
+            print('==> compute mean')
             mean = torch.zeros(3)
             std = torch.zeros(3)
+            cnt = 0
             for index in self.train:
+                cnt += 1
+                print( '{} | {}'.format(cnt, len(self.train)))
                 a = self.anno[index]
                 img_path = os.path.join(self.img_folder, a['img_paths'])
                 img = load_image(img_path) # CxHxW
@@ -113,8 +117,7 @@ class Mpii(data.Dataset):
         tpts = pts.clone()
         target = torch.zeros(nparts, self.out_res, self.out_res)
         for i in range(nparts):
-            # if tpts[i, 2] > 0: # This is evil!!
-            if tpts[i, 0] > 0:
+            if tpts[i, 2] > 0: # COCO visible: 0-no label, 1-label + invisible, 2-label + visible
                 tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2]+1, c, s, [self.out_res, self.out_res], rot=r))
                 target[i] = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
 
