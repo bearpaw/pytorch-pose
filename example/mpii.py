@@ -22,6 +22,11 @@ from pose.utils.transforms import fliplr, flip_back
 import pose.models as models
 import pose.datasets as datasets
 
+import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -308,7 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-classes', default=16, type=int, metavar='N',
                         help='Number of keypoints')
     # Training strategy
-    parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
+    parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
                         help='number of total epochs to run')
@@ -339,7 +344,7 @@ if __name__ == '__main__':
                         choices=['Gaussian', 'Cauchy'],
                         help='Labelmap dist type: (default=Gaussian)')
     # Miscs
-    parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
+    parser.add_argument('-c', '--checkpoint', default='checkpoint/mpii/hg8', type=str, metavar='PATH',
                         help='path to save checkpoint (default: checkpoint)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
