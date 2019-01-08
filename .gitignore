@@ -9,6 +9,7 @@ data/mpii/images
 *.idea/*
 test_transforms.py
 experiments
+run
 data/mscoco/coco
 data/mscoco/keypoint
 *.m~

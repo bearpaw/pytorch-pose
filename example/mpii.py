@@ -29,6 +29,8 @@ idx = [1,2,3,4,5,6,11,12,15,16]
 
 best_acc = 0
 
+# select proper device to run
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def main(args):
     global best_acc
@@ -41,12 +43,12 @@ def main(args):
     print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
     model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=args.num_classes)
 
-    model = torch.nn.DataParallel(model).cuda()
+    model = torch.nn.DataParallel(model).to(device)
 
     # define loss function (criterion) and optimizer
-    criterion = torch.nn.MSELoss(size_average=True).cuda()
+    criterion = torch.nn.MSELoss(reduction='mean').to(device)
 
-    optimizer = torch.optim.RMSprop(model.parameters(), 
+    optimizer = torch.optim.RMSprop(model.parameters(),
                                 lr=args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -66,11 +68,11 @@ def main(args):
             logger = Logger(join(args.checkpoint, 'log.txt'), title=title, resume=True)
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-    else:        
+    else:
         logger = Logger(join(args.checkpoint, 'log.txt'), title=title)
         logger.set_names(['Epoch', 'LR', 'Train Loss', 'Val Loss', 'Train Acc', 'Val Acc'])
 
-    cudnn.benchmark = True
+    cudnn.benchmark = True  # There is BN issue here see https://github.com/bearpaw/pytorch-pose/issues/33
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
     # Data loading code
@@ -79,7 +81,7 @@ def main(args):
                       sigma=args.sigma, label_type=args.label_type),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
-    
+
     val_loader = torch.utils.data.DataLoader(
         datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
                       sigma=args.sigma, label_type=args.label_type, train=False),
@@ -87,7 +89,7 @@ def main(args):
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        print('\nEvaluation only') 
+        print('\nEvaluation only')
         loss, acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
         save_pred(predictions, checkpoint=args.checkpoint)
         return
@@ -141,25 +143,23 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
 
     gt_win, pred_win = None, None
     bar = Bar('Processing', max=len(train_loader))
-    for i, (inputs, target, meta) in enumerate(train_loader):
+    for i, (input, target, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        input_var = torch.autograd.Variable(inputs.cuda())
-        target_var = torch.autograd.Variable(target.cuda(async=True))
+        input, target = input.to(device), target.to(device, non_blocking=True)
 
         # compute output
-        output = model(input_var)
-        score_map = output[-1].data.cpu()
+        output = model(input)
 
-        loss = criterion(output[0], target_var)
+        loss = criterion(output[0], target)
         for j in range(1, len(output)):
-            loss += criterion(output[j], target_var)
-        acc = accuracy(score_map, target, idx)
+            loss += criterion(output[j], target)
+        acc = accuracy(output[0], target, idx)
 
         if debug: # visualize groundtruth and predictions
-            gt_batch_img = batch_with_heatmap(inputs, target)
-            pred_batch_img = batch_with_heatmap(inputs, score_map)
+            gt_batch_img = batch_with_heatmap(input, target)
+            pred_batch_img = batch_with_heatmap(input, output[0])
             if not gt_win or not pred_win:
                 ax1 = plt.subplot(121)
                 ax1.title.set_text('Groundtruth')
@@ -174,8 +174,8 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
             plt.draw()
 
         # measure accuracy and record loss
-        losses.update(loss.data[0], inputs.size(0))
-        acces.update(acc[0], inputs.size(0))
+        losses.update(loss.item(), input.size(0))
+        acces.update(acc[0], input.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -218,32 +218,32 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
     gt_win, pred_win = None, None
     end = time.time()
     bar = Bar('Processing', max=len(val_loader))
-    for i, (inputs, target, meta) in enumerate(val_loader):
+    for i, (input, target, meta) in enumerate(val_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         target = target.cuda(async=True)
 
-        input_var = torch.autograd.Variable(inputs.cuda(), volatile=True)
-        target_var = torch.autograd.Variable(target, volatile=True)
+        input = input.to(device, non_blocking=True)
+        target = target.to(device, non_blocking=True)
 
         # compute output
-        output = model(input_var)
-        score_map = output[-1].data.cpu()
+        output = model(input)
+        score_map = output[-1].cpu()
         if flip:
-            flip_input_var = torch.autograd.Variable(
-                    torch.from_numpy(fliplr(inputs.clone().numpy())).float().cuda(), 
+            flip_input = torch.autograd.Variable(
+                    torch.from_numpy(fliplr(input.clone().numpy())).float().to(device),
                     volatile=True
                 )
-            flip_output_var = model(flip_input_var)
-            flip_output = flip_back(flip_output_var[-1].data.cpu())
+            flip_output_var = model(flip_input)
+            flip_output = flip_back(flip_output_var[-1].cpu())
             score_map += flip_output
 
 
 
         loss = 0
         for o in output:
-            loss += criterion(o, target_var)
+            loss += criterion(o, target)
         acc = accuracy(score_map, target.cpu(), idx)
 
         # generate predictions
@@ -253,8 +253,8 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
 
 
         if debug:
-            gt_batch_img = batch_with_heatmap(inputs, target)
-            pred_batch_img = batch_with_heatmap(inputs, score_map)
+            gt_batch_img = batch_with_heatmap(input, target)
+            pred_batch_img = batch_with_heatmap(input, score_map)
             if not gt_win or not pred_win:
                 plt.subplot(121)
                 gt_win = plt.imshow(gt_batch_img)
@@ -267,8 +267,8 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
             plt.draw()
 
         # measure accuracy and record loss
-        losses.update(loss.data[0], inputs.size(0))
-        acces.update(acc[0], inputs.size(0))
+        losses.update(loss.item(), input.size(0))
+        acces.update(acc[0], input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)

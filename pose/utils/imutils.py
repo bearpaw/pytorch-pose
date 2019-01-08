@@ -35,7 +35,7 @@ def resize(img, owidth, oheight):
     return img
 
 # =============================================================================
-# Helpful functions generating groundtruth labelmap 
+# Helpful functions generating groundtruth labelmap
 # =============================================================================
 
 def gaussian(shape=(7,7),sigma=1):
@@ -50,7 +50,7 @@ def gaussian(shape=(7,7),sigma=1):
     return to_torch(h).float()
 
 def draw_labelmap(img, pt, sigma, type='Gaussian'):
-    # Draw a 2D gaussian 
+    # Draw a 2D gaussian
     # Adopted from https://github.com/anewell/pose-hg-train/blob/master/src/pypose/draw.py
     img = to_numpy(img)
 
@@ -108,7 +108,7 @@ def imshow(img):
 
 def show_joints(img, pts):
     imshow(img)
-    
+
     for i in range(pts.size(0)):
         if pts[i, 2] > 0:
             plt.plot(pts[i, 0], pts[i, 1], 'yo')
@@ -126,7 +126,7 @@ def show_sample(inputs, target):
         for p in range(num_joints):
             tgt = inp*0.5 + color_heatmap(target[n,p,:,:])*0.5
             out = torch.cat((out, tgt), 2)
-        
+
         imshow(out)
         plt.show()
 
@@ -165,7 +165,7 @@ def sample_with_heatmap(inp, out, num_rows=2, parts_to_show=None):
 
     return full_img
 
-def batch_with_heatmap(inputs, outputs, mean=torch.Tensor([0.5, 0.5, 0.5]), num_rows=2, parts_to_show=None):
+def batch_with_heatmap(inputs, outputs, mean=torch.Tensor([0.5, 0.5, 0.5]).cuda(), num_rows=2, parts_to_show=None):
     batch_img = []
     for n in range(min(inputs.size(0), 4)):
         inp = inputs[n] + mean.view(3, 1, 1).expand_as(inputs[n])

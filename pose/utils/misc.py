@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import os
 import shutil
-import torch 
+import torch
 import math
 import numpy as np
 import scipy.io
@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 def to_numpy(tensor):
     if torch.is_tensor(tensor):
-        return tensor.cpu().numpy()
+        return tensor.detach().cpu().numpy()
     elif type(tensor).__module__ != 'numpy':
         raise ValueError("Cannot convert {} to numpy array"
                          .format(type(tensor)))

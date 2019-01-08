@@ -41,10 +41,11 @@ def calc_dists(preds, target, normalize):
                 dists[c, n] = -1
     return dists
 
-def dist_acc(dists, thr=0.5):
+def dist_acc(dist, thr=0.5):
     ''' Return percentage below threshold while ignoring values with a -1 '''
-    if dists.ne(-1).sum() > 0:
-        return dists.le(thr).eq(dists.ne(-1)).sum()*1.0 / dists.ne(-1).sum()
+    dist = dist[dist != -1]
+    if len(dist) > 0:
+        return 1.0 * (dist < thr).sum().item() / len(dist)
     else:
         return -1
 
@@ -63,11 +64,11 @@ def accuracy(output, target, idxs, thr=0.5):
 
     for i in range(len(idxs)):
         acc[i+1] = dist_acc(dists[idxs[i]-1])
-        if acc[i+1] >= 0: 
+        if acc[i+1] >= 0:
             avg_acc = avg_acc + acc[i+1]
             cnt += 1
-            
-    if cnt != 0:  
+
+    if cnt != 0:
         acc[0] = avg_acc / cnt
     return acc
 
@@ -95,7 +96,7 @@ def final_preds(output, center, scale, res):
 
     return preds
 
-    
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
