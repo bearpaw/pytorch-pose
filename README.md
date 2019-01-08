@@ -4,6 +4,8 @@ PyTorch-Pose is a PyTorch implementation of the general pipeline for 2D single h
 
 Some codes for data preparation and augmentation are brought from the [Stacked hourglass network](https://github.com/anewell/pose-hg-train). Thanks to the original author.
 
+**Update: this repository is compatible with PyTorch 1.0 now!**
+
 ## Features
 - Multi-thread data loading
 - Multi-GPU training
@@ -11,7 +13,7 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
 - Training/testing results visualization
 
 ## Installation
-1. PyTorch (>= 0.2.0): Please follow the [installation instruction of PyTorch](http://pytorch.org/). Note that the code is developed with Python2 and has not been tested with Python3 yet.
+1. PyTorch (>= 0.4.0): Please follow the [installation instruction of PyTorch](http://pytorch.org/). Note that the code is developed with Python2 and has not been tested with Python3 yet.
 
 2. Clone the repository with submodule
    ```
