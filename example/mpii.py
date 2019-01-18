@@ -41,7 +41,8 @@ def main(args):
 
     # create model
     print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
-    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks, num_classes=args.num_classes)
+    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks,
+                    num_classes=args.num_classes)
 
     model = torch.nn.DataParallel(model).to(device)
 
@@ -297,7 +298,7 @@ if __name__ == '__main__':
                         choices=model_names,
                         help='model architecture: ' +
                             ' | '.join(model_names) +
-                            ' (default: resnet18)')
+                            ' (default: hg)')
     parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
                         help='Number of hourglasses to stack')
     parser.add_argument('--features', default=256, type=int, metavar='N',
