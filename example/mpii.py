@@ -124,7 +124,7 @@ def main(args):
             'state_dict': model.state_dict(),
             'best_acc': best_acc,
             'optimizer' : optimizer.state_dict(),
-        }, predictions, is_best, checkpoint=args.checkpoint)
+        }, predictions, is_best, checkpoint=args.checkpoint, snapshot=args.snapshot)
 
     logger.close()
     logger.plot(['Train Acc', 'Val Acc'])
@@ -229,13 +229,10 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
         target = target.to(device, non_blocking=True)
 
         # compute output
-        output = model(input)
+        output = model(input)[-1]
         score_map = output[-1].cpu()
         if flip:
-            flip_input = torch.autograd.Variable(
-                    torch.from_numpy(fliplr(input.clone().numpy())).float().to(device),
-                    volatile=True
-                )
+            flip_input = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
             flip_output_var = model(flip_input)
             flip_output = flip_back(flip_output_var[-1].cpu())
             score_map += flip_output

@@ -1,24 +1,25 @@
 %% Generate JSON file for MSCOCO keypoint data
 clear all; close all;
 addpath('jsonlab/')
-addpath('../data/mscoco/coco/MatlabAPI/');
-trainval = [1, 0];
+addpath('../data/mscoco/cocoapi/MatlabAPI/');
+trainval  = [1, 0];
 personCnt = 0;
-DEBUG = false;
+DEBUG     = false;
+year      = 2014; % 2014 or 2017 
 
 for isv = trainval
   isValidation = isv;
   %% initialize COCO api (please specify dataType/annType below)
   annTypes = {'person_keypoints' };
   if isValidation
-    dataType='val5k2014'; annType=annTypes{1}; % specify dataType/annType
+    dataType = sprintf('val%d', year); annType=annTypes{1}; % specify dataType/annType
   else
-    dataType='train2014'; annType=annTypes{1}; % specify dataType/annType
+    dataType = sprintf('train%d', year); annType=annTypes{1}; % specify dataType/annType
   end
   
   
-  annFile=sprintf('../data/mscoco/keypoint/person_keypoints_train+val5k2014/%s_%s.json',annType,dataType);
-  coco=CocoApi(annFile);
+  annFile = sprintf('../data/mscoco/annotations/%s_%s.json',annType,dataType);
+  coco = CocoApi(annFile);
   
   %% display COCO categories and supercategories
   if( ~strcmp(annType,'captions') )
@@ -75,7 +76,6 @@ for isv = trainval
         % write to json
         joint_all(personCnt).dataset = 'coco';
         joint_all(personCnt).isValidation = isValidation;
-        joint_all(personCnt).isValidation = isValidation;
         
         joint_all(personCnt).img_paths = img.file_name;
         joint_all(personCnt).objpos = [mean(x(v>0)), mean(y(v>0))];
@@ -83,19 +83,18 @@ for isv = trainval
         joint_all(personCnt).scale_provided = scale;
         
         if DEBUG 
-          if isValidation
-            datadir ='val2014'; annType=annTypes{1}; % specify dataType/annType
-          else
-            datadir='train2014'; annType=annTypes{1}; % specify dataType/annType
-          end
-          I = imread(sprintf('../data/mscoco/keypoint/images/%s/%s',datadir,joint_all(personCnt).img_paths));
-          I = imresize(I, 1/joint_all(personCnt).scale_provided);
+          I = imread(sprintf('../data/mscoco/images/%s/%s',dataType,joint_all(personCnt).img_paths));
           imshow(I); hold on;
-          x1 = x/scale;
-          y1 = y/scale;
-          objpos = joint_all(personCnt).objpos/scale;
-          show_skeleton(x1, y1, v, sk, skc);
-          viscircles(objpos,5) 
+          x1 = x;
+          y1 = y;
+          objpos = joint_all(personCnt).objpos;
+          viscircles(objpos,5);
+          hold on;
+          visiblePart = joint_all(personCnt).joint_self(:,3) >= 1;
+          invisiblePart = joint_all(personCnt).joint_self(:,3) == 0;
+          plot(joint_all(personCnt).joint_self(visiblePart, 1), joint_all(personCnt).joint_self(visiblePart,2), 'y.', 'MarkerSize', 20);
+          plot(joint_all(personCnt).joint_self(invisiblePart,1), joint_all(personCnt).joint_self(invisiblePart,2), 'r.', 'MarkerSize', 20);
+          plot(joint_all(personCnt).objpos(1), joint_all(personCnt).objpos(2), 'cs');
           pause;close;
         end
       end
@@ -112,7 +111,7 @@ for isv = trainval
 end
 fprintf('save %d person\n', personCnt);
 
-opt.FileName = '../data/mscoco/coco_annotations.json';
+opt.FileName = sprintf('../data/mscoco/coco_annotations_%d.json', year);
 opt.FloatFormat = '%.3f';
 opt.Compact = 1;
 savejson('', joint_all, opt);

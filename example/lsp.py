@@ -46,7 +46,7 @@ def main(args):
     # define loss function (criterion) and optimizer
     criterion = torch.nn.MSELoss(size_average=True).cuda()
 
-    optimizer = torch.optim.RMSprop(model.parameters(), 
+    optimizer = torch.optim.RMSprop(model.parameters(),
                                 lr=args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -66,7 +66,7 @@ def main(args):
             logger = Logger(join(args.checkpoint, 'log.txt'), title=title, resume=True)
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-    else:        
+    else:
         logger = Logger(join(args.checkpoint, 'log.txt'), title=title)
         logger.set_names(['Epoch', 'LR', 'Train Loss', 'Val Loss', 'Train Acc', 'Val Acc'])
 
@@ -79,7 +79,7 @@ def main(args):
                       sigma=args.sigma, label_type=args.label_type),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
-    
+
     val_loader = torch.utils.data.DataLoader(
         datasets.LSP('data/lsp/LEEDS_annotations.json', 'data/lsp/images',
                       sigma=args.sigma, label_type=args.label_type, train=False),
@@ -87,7 +87,7 @@ def main(args):
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        print('\nEvaluation only') 
+        print('\nEvaluation only')
         loss, acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
         save_pred(predictions, checkpoint=args.checkpoint)
         return
@@ -174,7 +174,7 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
             plt.draw()
 
         # measure accuracy and record loss
-        losses.update(loss.data[0], inputs.size(0))
+        losses.update(loss.item(), inputs.size(0))
         acces.update(acc[0], inputs.size(0))
 
         # compute gradient and do SGD step
@@ -232,7 +232,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
         score_map = output[-1].data.cpu()
         if flip:
             flip_input_var = torch.autograd.Variable(
-                    torch.from_numpy(fliplr(inputs.clone().numpy())).float().cuda(), 
+                    torch.from_numpy(fliplr(inputs.clone().numpy())).float().cuda(),
                     volatile=True
                 )
             flip_output_var = model(flip_input_var)
@@ -267,7 +267,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
             plt.draw()
 
         # measure accuracy and record loss
-        losses.update(loss.data[0], inputs.size(0))
+        losses.update(loss.item(), inputs.size(0))
         acces.update(acc[0], inputs.size(0))
 
         # measure elapsed time

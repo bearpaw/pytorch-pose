@@ -11,7 +11,8 @@ test_transforms.py
 experiments
 run
 data/mscoco/coco
-data/mscoco/keypoint
+data/mscoco/annotations
+data/mscoco/images
 *.m~
 miscs/posetrack
 miscs/h36m

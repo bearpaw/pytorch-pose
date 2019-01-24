@@ -29,6 +29,9 @@ idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
 
 best_acc = 0
 
+# select proper device to run
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def main(args):
     global best_acc
@@ -44,9 +47,9 @@ def main(args):
     model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = torch.nn.MSELoss(size_average=True).cuda()
+    criterion = torch.nn.MSELoss(reduction='mean').cuda()
 
-    optimizer = torch.optim.RMSprop(model.parameters(), 
+    optimizer = torch.optim.RMSprop(model.parameters(),
                                 lr=args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -66,7 +69,7 @@ def main(args):
             logger = Logger(join(args.checkpoint, 'log.txt'), title=title, resume=True)
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
-    else:        
+    else:
         logger = Logger(join(args.checkpoint, 'log.txt'), title=title)
         logger.set_names(['Epoch', 'LR', 'Train Loss', 'Val Loss', 'Train Acc', 'Val Acc'])
 
@@ -75,19 +78,21 @@ def main(args):
 
     # Data loading code
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/train2014',
+        datasets.Mscoco('data/mscoco/coco_annotations_{}.json'.format(args.year),
+                        'data/mscoco/images/train{}'.format(args.year),
                         sigma=args.sigma, label_type=args.label_type),
         batch_size=args.train_batch, shuffle=True,
         num_workers=args.workers, pin_memory=True)
-    
+
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mscoco('data/mscoco/coco_annotations.json', 'data/mscoco/keypoint/images/val2014',
+        datasets.Mscoco('data/mscoco/coco_annotations_{}.json'.format(args.year),
+                        'data/mscoco/images/val{}'.format(args.year),
                         sigma=args.sigma, label_type=args.label_type, train=False),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        print('\nEvaluation only') 
+        print('\nEvaluation only')
         loss, acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
         save_pred(predictions, checkpoint=args.checkpoint)
         return
@@ -95,7 +100,7 @@ def main(args):
     lr = args.lr
     for epoch in range(args.start_epoch, args.epochs):
         lr = adjust_learning_rate(optimizer, epoch, lr, args.schedule, args.gamma)
-        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr)) 
+        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr))
 
         # train for one epoch
         train_loss, train_acc = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
@@ -135,25 +140,24 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
 
     gt_win, pred_win = None, None
     bar = Bar('Processing', max=len(train_loader))
-    for i, (inputs, target, meta) in enumerate(train_loader):
+    for i, (input, target, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        input_var = torch.autograd.Variable(inputs.cuda())
-        target_var = torch.autograd.Variable(target.cuda(async=True))
+        input, target = input.to(device), target.to(device, non_blocking=True)
 
         # compute output
-        output = model(input_var)
+        output = model(input)
         score_map = output[-1].data.cpu()
 
-        loss = criterion(output[0], target_var)
+        loss = criterion(output[0], target)
         for j in range(1, len(output)):
-            loss += criterion(output[j], target_var)
-        acc = accuracy(score_map, target, idx)
+            loss += criterion(output[j], target)
+        acc = accuracy(score_map, target.cpu(), idx)
 
         if debug: # visualize groundtruth and predictions
-            gt_batch_img = batch_with_heatmap(inputs, target)
-            pred_batch_img = batch_with_heatmap(inputs, score_map)
+            gt_batch_img = batch_with_heatmap(input, target)
+            pred_batch_img = batch_with_heatmap(input, score_map)
             if not gt_win or not pred_win:
                 ax1 = plt.subplot(121)
                 ax1.title.set_text('Groundtruth')
@@ -168,8 +172,8 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
             plt.draw()
 
         # measure accuracy and record loss
-        losses.update(loss.data[0], inputs.size(0))
-        acces.update(acc[0], inputs.size(0))
+        losses.update(loss.item(), input.size(0))
+        acces.update(acc[0], input.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -212,74 +216,73 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
     gt_win, pred_win = None, None
     end = time.time()
     bar = Bar('Processing', max=len(val_loader))
-    for i, (inputs, target, meta) in enumerate(val_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
 
-        target = target.cuda(async=True)
+    with torch.no_grad():
+        for i, (input, target, meta) in enumerate(val_loader):
+            # measure data loading time
+            data_time.update(time.time() - end)
 
-        input_var = torch.autograd.Variable(inputs.cuda(), volatile=True)
-        target_var = torch.autograd.Variable(target, volatile=True)
+            target = target.cuda(async=True)
 
-        # compute output
-        output = model(input_var)
-        score_map = output[-1].data.cpu()
-        if flip:
-            flip_input_var = torch.autograd.Variable(
-                    torch.from_numpy(fliplr(inputs.clone().numpy())).float().cuda(), 
-                    volatile=True
-                )
-            flip_output_var = model(flip_input_var)
-            flip_output = flip_back(flip_output_var[-1].data.cpu())
-            score_map += flip_output
+            input = input.to(device, non_blocking=True)
+            target = target.to(device, non_blocking=True)
 
+            # compute output
+            output = model(input)
+            score_map = output[-1].data.cpu()
+            if flip:
+                flip_input_var = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
+                flip_output_var = model(flip_input_var)
+                flip_output = flip_back(flip_output_var[-1].data.cpu())
+                score_map += flip_output
 
 
-        loss = 0
-        for o in output:
-            loss += criterion(o, target_var)
-        acc = accuracy(score_map, target.cpu(), idx)
 
-        # generate predictions
-        preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
-        for n in range(score_map.size(0)):
-            predictions[meta['index'][n], :, :] = preds[n, :, :]
+            loss = 0
+            for o in output:
+                loss += criterion(o, target)
+            acc = accuracy(score_map, target.cpu(), idx)
+
+            # generate predictions
+            preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
+            for n in range(score_map.size(0)):
+                predictions[meta['index'][n], :, :] = preds[n, :, :]
 
 
-        if debug:
-            gt_batch_img = batch_with_heatmap(inputs, target)
-            pred_batch_img = batch_with_heatmap(inputs, score_map)
-            if not gt_win or not pred_win:
-                plt.subplot(121)
-                gt_win = plt.imshow(gt_batch_img)
-                plt.subplot(122)
-                pred_win = plt.imshow(pred_batch_img)
-            else:
-                gt_win.set_data(gt_batch_img)
-                pred_win.set_data(pred_batch_img)
-            plt.pause(.5)
-            plt.draw()
+            if debug:
+                gt_batch_img = batch_with_heatmap(input, target)
+                pred_batch_img = batch_with_heatmap(input, score_map)
+                if not gt_win or not pred_win:
+                    plt.subplot(121)
+                    gt_win = plt.imshow(gt_batch_img)
+                    plt.subplot(122)
+                    pred_win = plt.imshow(pred_batch_img)
+                else:
+                    gt_win.set_data(gt_batch_img)
+                    pred_win.set_data(pred_batch_img)
+                plt.pause(.5)
+                plt.draw()
 
-        # measure accuracy and record loss
-        losses.update(loss.data[0], inputs.size(0))
-        acces.update(acc[0], inputs.size(0))
+            # measure accuracy and record loss
+            losses.update(loss.item(), input.size(0))
+            acces.update(acc[0], input.size(0))
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
 
-        # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                    batch=i + 1,
-                    size=len(val_loader),
-                    data=data_time.val,
-                    bt=batch_time.avg,
-                    total=bar.elapsed_td,
-                    eta=bar.eta_td,
-                    loss=losses.avg,
-                    acc=acces.avg
-                    )
-        bar.next()
+            # plot progress
+            bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
+                        batch=i + 1,
+                        size=len(val_loader),
+                        data=data_time.val,
+                        bt=batch_time.avg,
+                        total=bar.elapsed_td,
+                        eta=bar.eta_td,
+                        loss=losses.avg,
+                        acc=acces.avg
+                        )
+            bar.next()
 
     bar.finish()
     return losses.avg, acces.avg, predictions
@@ -293,6 +296,8 @@ if __name__ == '__main__':
                             ' (default: resnet18)')
     parser.add_argument('--num-classes', default=17, type=int, metavar='N',
                         help='Number of keypoints')
+    parser.add_argument('--year', default=2014, type=int, metavar='N',
+                        help='year of coco dataset: 2014 (default) | 2017)')
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=90, type=int, metavar='N',
