@@ -21,28 +21,51 @@ from pose.utils.transforms import fliplr, flip_back
 import pose.models as models
 import pose.datasets as datasets
 
+
+# get model names and dataset names
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 
-idx = [1,2,3,4,5,6,11,12,15,16]
 
+dataset_names = sorted(name for name in datasets.__dict__
+    if name.islower() and not name.startswith("__")
+    and callable(datasets.__dict__[name]))
+
+
+# init global variables
 best_acc = 0
+idx = []
 
 # select proper device to run
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+cudnn.benchmark = True  # There is BN issue for early version of PyTorch
+                        # see https://github.com/bearpaw/pytorch-pose/issues/33
 
 def main(args):
     global best_acc
+    global idx
+
+    # idx is the index of joints used to compute accuracy
+    if args.dataset in ['mpii', 'lsp']:
+        idx = [1,2,3,4,5,6,11,12,15,16]
+    elif args.dataset == 'mscoco':
+        idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+    else:
+        print("Unknown dataset: {}".format(args.dataset))
+        assert False
 
     # create checkpoint dir
     if not isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
 
     # create model
+    njoints = datasets.__dict__[args.dataset].njoints
+
     print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
-    model = models.__dict__[args.arch](num_stacks=args.stacks, num_blocks=args.blocks,
-                    num_classes=args.num_classes)
+    model = models.__dict__[args.arch](num_stacks=args.stacks,
+                                       num_blocks=args.blocks,
+                                       num_classes=njoints)
 
     model = torch.nn.DataParallel(model).to(device)
 
@@ -50,12 +73,12 @@ def main(args):
     criterion = torch.nn.MSELoss(reduction='mean').to(device)
 
     optimizer = torch.optim.RMSprop(model.parameters(),
-                                lr=args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
+                                    lr=args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay)
 
     # optionally resume from a checkpoint
-    title = 'mpii-' + args.arch
+    title = args.dataset + ' ' + args.arch
     if args.resume:
         if isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
@@ -71,30 +94,36 @@ def main(args):
             print("=> no checkpoint found at '{}'".format(args.resume))
     else:
         logger = Logger(join(args.checkpoint, 'log.txt'), title=title)
-        logger.set_names(['Epoch', 'LR', 'Train Loss', 'Val Loss', 'Train Acc', 'Val Acc'])
+        logger.set_names(['Epoch', 'LR', 'Train Loss', 'Val Loss',
+                          'Train Acc', 'Val Acc'])
 
-    cudnn.benchmark = True  # There is BN issue here see https://github.com/bearpaw/pytorch-pose/issues/33
-    print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
+    print('    Total params: %.2fM'
+          % (sum(p.numel() for p in model.parameters())/1000000.0))
 
-    # Data loading code
+    # create data loader
+    train_dataset = datasets.__dict__[args.dataset](is_train=True, **vars(args))
     train_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
-                      sigma=args.sigma, label_type=args.label_type),
+        train_dataset,
         batch_size=args.train_batch, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=True
+    )
 
+    val_dataset = datasets.__dict__[args.dataset](is_train=False, **vars(args))
     val_loader = torch.utils.data.DataLoader(
-        datasets.Mpii('data/mpii/mpii_annotations.json', 'data/mpii/images',
-                      sigma=args.sigma, label_type=args.label_type, train=False),
+        val_dataset,
         batch_size=args.test_batch, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=True
+    )
 
+    # evaluation only
     if args.evaluate:
         print('\nEvaluation only')
-        loss, acc, predictions = validate(val_loader, model, criterion, args.num_classes, args.debug, args.flip)
+        loss, acc, predictions = validate(val_loader, model, criterion, njoints,
+                                          args.debug, args.flip)
         save_pred(predictions, checkpoint=args.checkpoint)
         return
 
+    # train and eval
     lr = args.lr
     for epoch in range(args.start_epoch, args.epochs):
         lr = adjust_learning_rate(optimizer, epoch, lr, args.schedule, args.gamma)
@@ -106,11 +135,12 @@ def main(args):
             val_loader.dataset.sigma *=  args.sigma_decay
 
         # train for one epoch
-        train_loss, train_acc = train(train_loader, model, criterion, optimizer, args.debug, args.flip)
+        train_loss, train_acc = train(train_loader, model, criterion, optimizer,
+                                      args.debug, args.flip)
 
         # evaluate on validation set
-        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion, args.num_classes,
-                                                      args.debug, args.flip)
+        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion,
+                                                  njoints, args.debug, args.flip)
 
         # append logger file
         logger.append([epoch + 1, lr, train_loss, valid_loss, train_acc, valid_acc])
@@ -143,7 +173,7 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
     end = time.time()
 
     gt_win, pred_win = None, None
-    bar = Bar('Processing', max=len(train_loader))
+    bar = Bar('Train', max=len(train_loader))
     for i, (input, target, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -218,7 +248,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
 
     gt_win, pred_win = None, None
     end = time.time()
-    bar = Bar('Processing', max=len(val_loader))
+    bar = Bar('Eval ', max=len(val_loader))
     for i, (input, target, meta) in enumerate(val_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -229,7 +259,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
         target = target.to(device, non_blocking=True)
 
         # compute output
-        output = model(input)[-1]
+        output = model(input)
         score_map = output[-1].cpu()
         if flip:
             flip_input = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
@@ -242,6 +272,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
         loss = 0
         for o in output:
             loss += criterion(o, target)
+
         acc = accuracy(score_map, target.cpu(), idx)
 
         # generate predictions
@@ -290,6 +321,19 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+    # Dataset setting
+    parser.add_argument('--dataset', metavar='DATASET', default='mpii',
+                        choices=dataset_names,
+                        help='Datasets: ' +
+                            ' | '.join(dataset_names) +
+                            ' (default: mpii)')
+    parser.add_argument('--year', default=2014, type=int, metavar='N',
+                        help='year of coco dataset: 2014 (default) | 2017)')
+    parser.add_argument('--inp-res', default=256, type=int,
+                        help='input resolution (default: 256)')
+    parser.add_argument('--out-res', default=64, type=int,
+                    help='output resolution (default: 64, to gen GT)')
+
     # Model structure
     parser.add_argument('--arch', '-a', metavar='ARCH', default='hg',
                         choices=model_names,
@@ -302,8 +346,6 @@ if __name__ == '__main__':
                         help='Number of features in the hourglass')
     parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
                         help='Number of residual modules at each location in the hourglass')
-    parser.add_argument('--num-classes', default=16, type=int, metavar='N',
-                        help='Number of keypoints')
     # Training strategy
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
@@ -330,6 +372,10 @@ if __name__ == '__main__':
                         help='flip the input during validation')
     parser.add_argument('--sigma', type=float, default=1,
                         help='Groundtruth Gaussian sigma.')
+    parser.add_argument('--scale-factor', type=float, default=0.25,
+                        help='Scale factor (data aug).')
+    parser.add_argument('--rot-factor', type=float, default=30,
+                        help='Rotation factor (data aug).')
     parser.add_argument('--sigma-decay', type=float, default=0,
                         help='Sigma decay rate for each epoch.')
     parser.add_argument('--label-type', metavar='LABELTYPE', default='Gaussian',

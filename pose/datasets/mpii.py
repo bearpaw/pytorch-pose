@@ -15,27 +15,27 @@ from pose.utils.transforms import *
 
 
 class Mpii(data.Dataset):
-    def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, sigma=1,
-                 scale_factor=0.25, rot_factor=30, label_type='Gaussian'):
-        self.img_folder = img_folder    # root image folders
-        self.is_train = train           # training set or test set
-        self.inp_res = inp_res
-        self.out_res = out_res
-        self.sigma = sigma
-        self.scale_factor = scale_factor
-        self.rot_factor = rot_factor
-        self.label_type = label_type
+    def __init__(self, is_train = True, **kwargs):
+        self.img_folder = './data/mpii/images' # root image folders
+        self.jsonfile   = './data/mpii/mpii_annotations.json'
+        self.is_train   = is_train # training set or test set
+        self.inp_res    = kwargs['inp_res']
+        self.out_res    = kwargs['out_res']
+        self.sigma      = kwargs['sigma']
+        self.scale_factor = kwargs['scale_factor']
+        self.rot_factor = kwargs['rot_factor']
+        self.label_type = kwargs['label_type']
 
         # create train/val split
-        with open(jsonfile) as anno_file:   
+        with open(self.jsonfile) as anno_file:
             self.anno = json.load(anno_file)
 
-        self.train, self.valid = [], []
+        self.train_list, self.valid_list = [], []
         for idx, val in enumerate(self.anno):
             if val['isValidation'] == True:
-                self.valid.append(idx)
+                self.valid_list.append(idx)
             else:
-                self.train.append(idx)
+                self.train_list.append(idx)
         self.mean, self.std = self._compute_mean()
 
     def _compute_mean(self):
@@ -45,14 +45,14 @@ class Mpii(data.Dataset):
         else:
             mean = torch.zeros(3)
             std = torch.zeros(3)
-            for index in self.train:
+            for index in self.train_list:
                 a = self.anno[index]
                 img_path = os.path.join(self.img_folder, a['img_paths'])
                 img = load_image(img_path) # CxHxW
                 mean += img.view(img.size(0), -1).mean(1)
                 std += img.view(img.size(0), -1).std(1)
-            mean /= len(self.train)
-            std /= len(self.train)
+            mean /= len(self.train_list)
+            std /= len(self.train_list)
             meanstd = {
                 'mean': mean,
                 'std': std,
@@ -61,16 +61,16 @@ class Mpii(data.Dataset):
         if self.is_train:
             print('    Mean: %.4f, %.4f, %.4f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
             print('    Std:  %.4f, %.4f, %.4f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
-            
+
         return meanstd['mean'], meanstd['std']
 
     def __getitem__(self, index):
         sf = self.scale_factor
         rf = self.rot_factor
         if self.is_train:
-            a = self.anno[self.train[index]]
+            a = self.anno[self.train_list[index]]
         else:
-            a = self.anno[self.valid[index]]
+            a = self.anno[self.valid_list[index]]
 
         img_path = os.path.join(self.img_folder, a['img_paths'])
         pts = torch.Tensor(a['joint_self'])
@@ -119,13 +119,19 @@ class Mpii(data.Dataset):
                 target[i] = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
 
         # Meta info
-        meta = {'index' : index, 'center' : c, 'scale' : s, 
+        meta = {'index' : index, 'center' : c, 'scale' : s,
         'pts' : pts, 'tpts' : tpts}
 
         return inp, target, meta
 
     def __len__(self):
         if self.is_train:
-            return len(self.train)
+            return len(self.train_list)
         else:
-            return len(self.valid)
+            return len(self.valid_list)
+
+
+def mpii(**kwargs):
+    return Mpii(**kwargs)
+
+mpii.njoints = 16  # ugly but works

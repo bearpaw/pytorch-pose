@@ -3,7 +3,6 @@ checkpoint
 dev
 *.pth.tar
 data/mpii/images
-!data/mpii/mean.pth.tar
 *.json
 *debug*
 *.idea/*
@@ -17,6 +16,7 @@ data/mscoco/images
 miscs/posetrack
 miscs/h36m
 data/h36m
+!mean.pth.tar
 
 __pycache__/
 *.py[cod]

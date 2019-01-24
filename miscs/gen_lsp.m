@@ -5,8 +5,8 @@ function gen_lsp
 addpath('jsonlab/')
 % in cpp: real scale = param_.target_dist()/meta.scale_self = (41/35)/scale_input
 targetDist = 41/35; % in caffe cpp file 41/35
-oriTrTe = load('/home/wyang/Data/dataset/LSP/joints.mat');
-extTrain = load('/home/wyang/Data/dataset/lspet_dataset/joints.mat');
+oriTrTe = load('../data/lsp/lsp_dataset/joints.mat');
+extTrain = load('../data/lsp/lspet_dataset/joints.mat');
 
 % in LEEDS:
 % 1  Right ankle
@@ -62,7 +62,7 @@ extTrain.joints(8, 3, :) = 1;
 count = 1;
 
 path = {'lspet_dataset/images/im%05d.jpg', 'lsp_dataset/images/im%04d.jpg'};
-local_path = {'/home/wyang/Data/dataset/lspet_dataset/images/im%05d.jpg', '/home/wyang/Data/dataset/LSP/images/im%04d.jpg'};
+local_path = {'../data/lsp/lspet_dataset/images/im%05d.jpg', '../data/lsp/lsp_dataset/images/im%04d.jpg'};
 num_image = [10000, 1000]; %[10000, 2000];
 
 for dataset = 1:2

@@ -1,5 +1,7 @@
 # PyTorch-Pose
 
+![screenshot](./docs/screenshot.png)
+
 PyTorch-Pose is a PyTorch implementation of the general pipeline for 2D single human pose estimation. The aim is to provide the interface of the training/inference/evaluation, and the dataloader with various data augmentation options for the most popular human pose databases (e.g., [the MPII human pose](http://human-pose.mpi-inf.mpg.de), [LSP](http://www.comp.leeds.ac.uk/mat4saj/lsp.html) and [FLIC](http://bensapp.github.io/flic-dataset.html)).
 
 Some codes for data preparation and augmentation are brought from the [Stacked hourglass network](https://github.com/anewell/pose-hg-train). Thanks to the original author.
@@ -37,12 +39,14 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
 
 ## Usage
 
+**Please refer to [TRAINING.md](TRAINING.md) for detailed training recipes!**
+
 ### Testing
 You may download our pretrained models (e.g., [2-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing)) for a quick start.
 
 Run the following command in terminal to evaluate the model on MPII validation split (The train/val split is from [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip)).
 ```
-CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg --stacks 2 --blocks 1 --checkpoint checkpoint/mpii/hg_s2_b1 --resume checkpoint/mpii/hg_s2_b1/model_best.pth.tar -e -d
+CUDA_VISIBLE_DEVICES=0 python example/main.py --dataset mpii -a hg --stacks 2 --blocks 1 --checkpoint checkpoint/mpii/hg_s2_b1 --resume checkpoint/mpii/hg_s2_b1/model_best.pth.tar -e -d
 ```
 * `-a` specifies a network architecture
 * `--resume` will load the weight from a specific model
@@ -77,21 +81,18 @@ You may also evaluate the result by running `python evaluation/eval_PCKh.py` to 
 ### Training
 Run the following command in terminal to train an 8-stack of hourglass network on the MPII human pose dataset.
 ```
-CUDA_VISIBLE_DEVICES=0 python example/mpii.py -a hg --stacks 8 --blocks 1 --checkpoint checkpoint/mpii/hg8 -j 4
+CUDA_VISIBLE_DEVICES=0 python example/main.py --dataset mpii -a hg --stacks 8 --blocks 1 --checkpoint checkpoint/mpii/hg8 -j 4
 ```
 Here,
 * `CUDA_VISIBLE_DEVICES=0` identifies the GPU devices you want to use. For example, use `CUDA_VISIBLE_DEVICES=0,1` if you want to use two GPUs with ID `0` and `1`.
 * `-j` specifies how many workers you want to use for data loading.
 * `--checkpoint` specifies where you want to save the models, the log and the predictions to.
 
-Please refer to the `example/mpii.py` for the supported options/arguments.
-
-## To Do List
+## Miscs
 Supported dataset
 - [x] [MPII human pose](http://human-pose.mpi-inf.mpg.de)
 - [x] [Leeds Sports Pose (LSP)](http://sam.johnson.io/research/lsp.html)
 - [x] [MSCOCO (single person)](http://cocodataset.org/#keypoints-challenge2017)
-- [ ] FLIC
 
 Supported models
 - [x] [Stacked Hourglass networks](https://arxiv.org/abs/1603.06937)

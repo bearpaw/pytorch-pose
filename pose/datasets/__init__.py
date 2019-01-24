@@ -1,5 +1,5 @@
-from .mpii import Mpii
-from .mscoco import Mscoco
-from .lsp import LSP
+from .mpii import mpii
+from .mscoco import mscoco
+from .lsp import lsp
 
-__all__ = ('Mpii', 'Mscoco', 'LSP')
+__all__ = ('mpii', 'mscoco', 'lsp')

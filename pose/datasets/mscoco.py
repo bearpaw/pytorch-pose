@@ -15,19 +15,25 @@ from pose.utils.transforms import *
 
 
 class Mscoco(data.Dataset):
-    def __init__(self, jsonfile, img_folder, inp_res=256, out_res=64, train=True, sigma=1,
-                 scale_factor=0.25, rot_factor=30, label_type='Gaussian'):
-        self.img_folder = img_folder    # root image folders
-        self.is_train = train           # training set or test set
-        self.inp_res = inp_res
-        self.out_res = out_res
-        self.sigma = sigma
-        self.scale_factor = scale_factor
-        self.rot_factor = rot_factor
-        self.label_type = label_type
+    def __init__(self, is_train=True, **kwargs):
+        self.is_train   = is_train # training set or test set
+        self.inp_res    = kwargs['inp_res']
+        self.out_res    = kwargs['out_res']
+        self.sigma      = kwargs['sigma']
+        self.scale_factor = kwargs['scale_factor']
+        self.rot_factor = kwargs['rot_factor']
+        self.label_type = kwargs['label_type']
+        self.year       = kwargs['year']
+
+        if is_train:
+            self.img_folder = './data/mscoco/images/train{}'.format(self.year)    # root image folders
+        else:
+            self.img_folder = './data/mscoco/images/val{}'.format(self.year)    # root image folders
+
+        self.jsonfile   = './data/mscoco/coco_annotations_{}.json'.format(self.year)  # anno file
 
         # create train/val split
-        with open(jsonfile) as anno_file:   
+        with open(self.jsonfile) as anno_file:
             self.anno = json.load(anno_file)
 
         self.train, self.valid = [], []
@@ -65,7 +71,7 @@ class Mscoco(data.Dataset):
         if self.is_train:
             print('    Mean: %.4f, %.4f, %.4f' % (meanstd['mean'][0], meanstd['mean'][1], meanstd['mean'][2]))
             print('    Std:  %.4f, %.4f, %.4f' % (meanstd['std'][0], meanstd['std'][1], meanstd['std'][2]))
-            
+
         return meanstd['mean'], meanstd['std']
 
     def __getitem__(self, index):
@@ -122,7 +128,7 @@ class Mscoco(data.Dataset):
                 target[i] = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
 
         # Meta info
-        meta = {'index' : index, 'center' : c, 'scale' : s, 
+        meta = {'index' : index, 'center' : c, 'scale' : s,
         'pts' : pts, 'tpts' : tpts}
 
         return inp, target, meta
@@ -132,3 +138,8 @@ class Mscoco(data.Dataset):
             return len(self.train)
         else:
             return len(self.valid)
+
+def mscoco(**kwargs):
+    return Mscoco(**kwargs)
+
+mscoco.njoints = 17  # ugly but works
