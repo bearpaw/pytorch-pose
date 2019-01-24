@@ -229,7 +229,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
         target = target.to(device, non_blocking=True)
 
         # compute output
-        output = model(input)[-1]
+        output = model(input)
         score_map = output[-1].cpu()
         if flip:
             flip_input = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
