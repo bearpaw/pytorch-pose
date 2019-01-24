@@ -11,12 +11,3 @@ To train on coco (single person pose estimation), place the following files in t
 
 ### Prepare `json` annotation file
 Please edit `year = 2017; % 2014 or 2017 ` in [gen_coco.m](https://github.com/bearpaw/pytorch-pose/blob/master/miscs/gen_coco.m) to generate the corresponding annotation file (coco2014 or coco2017).
-
-### Training recipes
-
-```
-CUDA_VISIBLE_DEVICES=1 python example/mscoco.py \
---checkpoint checkpoint/mscoco/hg-s1-b1 \
--s 1 \
--b 1
-```

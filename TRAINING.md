@@ -31,6 +31,8 @@ images`
   rm -rf *.zip
   ```
 
+  - Download the [coco_annotations_2014.json](https://drive.google.com/open?id=1jrxis4ujrLlkwoD2GOdv3PGzygpQ04k7) and [coco_annotations_2017.json](https://drive.google.com/open?id=1YuzpScAfzemwZqUuZBrbBZdoplXEqUse) in our JSON format, and save it to `./data/mscoco`
+
 - You are good to go!
 
 ### Leeds Sports Pose (LSP)
@@ -43,6 +45,9 @@ images`
   unzip lsp_dataset.zip -d lsp_dataset
   unzip lspet_dataset.zip -d lspet_dataset
   ```
+
+  - Download the [LEEDS_annotations.json](https://drive.google.com/open?id=1GZxlTLuMfA3VRvz2jyv8fhJDqElNrgKS) in our JSON format, and save it to `./data/lsp`
+
 - You are good to go!
 
 ## Training
