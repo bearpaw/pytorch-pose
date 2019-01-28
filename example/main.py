@@ -182,15 +182,19 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
 
         # compute output
         output = model(input)
+        if type(output) == list:  # multiple output
 
-        loss = criterion(output[0], target)
-        for j in range(1, len(output)):
-            loss += criterion(output[j], target)
-        acc = accuracy(output[0], target, idx)
+            loss = criterion(output[0], target)
+            for j in range(1, len(output)):
+                loss += criterion(output[j], target)
+            output = output[0]
+        else:  # single output
+            loss = criterion(output, target)
+        acc = accuracy(output, target, idx)
 
         if debug: # visualize groundtruth and predictions
             gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, output[0])
+            pred_batch_img = batch_with_heatmap(input, output)
             if not gt_win or not pred_win:
                 ax1 = plt.subplot(121)
                 ax1.title.set_text('Groundtruth')
@@ -260,7 +264,7 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
 
         # compute output
         output = model(input)
-        score_map = output[-1].cpu()
+        score_map = output[-1].cpu() if type(output) == list else output.cpu()
         if flip:
             flip_input = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
             flip_output_var = model(flip_input)
@@ -349,7 +353,7 @@ if __name__ == '__main__':
     # Training strategy
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
-    parser.add_argument('--epochs', default=90, type=int, metavar='N',
+    parser.add_argument('--epochs', default=100, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
@@ -384,6 +388,8 @@ if __name__ == '__main__':
     # Miscs
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
                         help='path to save checkpoint (default: checkpoint)')
+    parser.add_argument('--snapshot', default=0, type=int,
+                        help='save models for every #snapshot epochs (default: 0)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
