@@ -257,8 +257,6 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        target = target.cuda(async=True)
-
         input = input.to(device, non_blocking=True)
         target = target.to(device, non_blocking=True)
 
