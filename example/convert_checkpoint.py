@@ -49,7 +49,7 @@ def main(args):
     # idx is the index of joints used to compute accuracy
     if args.dataset in ['mpii', 'lsp']:
         idx = [1,2,3,4,5,6,11,12,15,16]
-    elif args.dataset == 'coco':
+    elif args.dataset == 'mscoco':
         idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
     else:
         print("Unknown dataset: {}".format(args.dataset))
@@ -100,226 +100,25 @@ def main(args):
     print('    Total params: %.2fM'
           % (sum(p.numel() for p in model.parameters())/1000000.0))
 
-    # create data loader
-    train_dataset = datasets.__dict__[args.dataset](is_train=True, **vars(args))
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset,
-        batch_size=args.train_batch, shuffle=True,
-        num_workers=args.workers, pin_memory=True
-    )
 
-    val_dataset = datasets.__dict__[args.dataset](is_train=False, **vars(args))
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=args.test_batch, shuffle=False,
-        num_workers=args.workers, pin_memory=True
-    )
+    # save a cleaned version of model without dict and DataParallel
+    clean_model = checkpoint['state_dict']
 
-    # evaluation only
-    if args.evaluate:
-        print('\nEvaluation only')
-        loss, acc, predictions = validate(val_loader, model, criterion, njoints,
-                                          args.debug, args.flip)
-        save_pred(predictions, checkpoint=args.checkpoint)
-        return
+    # create new OrderedDict that does not contain `module.`
+    from collections import OrderedDict
+    clean_model = OrderedDict()
+    if any(key.startswith('module') for key in checkpoint['state_dict']):
+        for k, v in checkpoint['state_dict'].items():
+            name = k[7:] # remove `module.`
+            clean_model[name] = v
+    # import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
+    # while any(key.startswith('module') for key in clean_model):
+    #     clean_model = clean_model.module
+    clean_model_path = join(args.checkpoint, 'clean_model.pth.tar')
+    torch.save(clean_model, clean_model_path)
+    print('clean model saved: {}'.format(clean_model_path))
 
-    # train and eval
-    lr = args.lr
-    for epoch in range(args.start_epoch, args.epochs):
-        lr = adjust_learning_rate(optimizer, epoch, lr, args.schedule, args.gamma)
-        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr))
-
-        # decay sigma
-        if args.sigma_decay > 0:
-            train_loader.dataset.sigma *=  args.sigma_decay
-            val_loader.dataset.sigma *=  args.sigma_decay
-
-        # train for one epoch
-        train_loss, train_acc = train(train_loader, model, criterion, optimizer,
-                                      args.debug, args.flip)
-
-        # evaluate on validation set
-        valid_loss, valid_acc, predictions = validate(val_loader, model, criterion,
-                                                  njoints, args.debug, args.flip)
-
-        # append logger file
-        logger.append([epoch + 1, lr, train_loss, valid_loss, train_acc, valid_acc])
-
-        # remember best acc and save checkpoint
-        is_best = valid_acc > best_acc
-        best_acc = max(valid_acc, best_acc)
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'arch': args.arch,
-            'state_dict': model.state_dict(),
-            'best_acc': best_acc,
-            'optimizer' : optimizer.state_dict(),
-        }, predictions, is_best, checkpoint=args.checkpoint, snapshot=args.snapshot)
-
-    logger.close()
-    logger.plot(['Train Acc', 'Val Acc'])
-    savefig(os.path.join(args.checkpoint, 'log.eps'))
-
-
-def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    acces = AverageMeter()
-
-    # switch to train mode
-    model.train()
-
-    end = time.time()
-
-    gt_win, pred_win = None, None
-    bar = Bar('Train', max=len(train_loader))
-    for i, (input, target, meta) in enumerate(train_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
-
-        input, target = input.to(device), target.to(device, non_blocking=True)
-
-        # compute output
-        output = model(input)
-        if type(output) == list:  # multiple output
-
-            loss = criterion(output[0], target)
-            for j in range(1, len(output)):
-                loss += criterion(output[j], target)
-            output = output[0]
-        else:  # single output
-            loss = criterion(output, target)
-        acc = accuracy(output, target, idx)
-
-        if debug: # visualize groundtruth and predictions
-            gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, output)
-            if not gt_win or not pred_win:
-                ax1 = plt.subplot(121)
-                ax1.title.set_text('Groundtruth')
-                gt_win = plt.imshow(gt_batch_img)
-                ax2 = plt.subplot(122)
-                ax2.title.set_text('Prediction')
-                pred_win = plt.imshow(pred_batch_img)
-            else:
-                gt_win.set_data(gt_batch_img)
-                pred_win.set_data(pred_batch_img)
-            plt.pause(.05)
-            plt.draw()
-
-        # measure accuracy and record loss
-        losses.update(loss.item(), input.size(0))
-        acces.update(acc[0], input.size(0))
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                    batch=i + 1,
-                    size=len(train_loader),
-                    data=data_time.val,
-                    bt=batch_time.val,
-                    total=bar.elapsed_td,
-                    eta=bar.eta_td,
-                    loss=losses.avg,
-                    acc=acces.avg
-                    )
-        bar.next()
-
-    bar.finish()
-    return losses.avg, acces.avg
-
-
-def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    acces = AverageMeter()
-
-    # predictions
-    predictions = torch.Tensor(val_loader.dataset.__len__(), num_classes, 2)
-
-    # switch to evaluate mode
-    model.eval()
-
-    gt_win, pred_win = None, None
-    end = time.time()
-    bar = Bar('Eval ', max=len(val_loader))
-    for i, (input, target, meta) in enumerate(val_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
-
-        input = input.to(device, non_blocking=True)
-        target = target.to(device, non_blocking=True)
-
-        # compute output
-        output = model(input)
-        score_map = output[-1].cpu() if type(output) == list else output.cpu()
-        if flip:
-            flip_input = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
-            flip_output_var = model(flip_input)
-            flip_output = flip_back(flip_output_var[-1].cpu())
-            score_map += flip_output
-
-
-
-        loss = 0
-        for o in output:
-            loss += criterion(o, target)
-
-        acc = accuracy(score_map, target.cpu(), idx)
-
-        # generate predictions
-        preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
-        for n in range(score_map.size(0)):
-            predictions[meta['index'][n], :, :] = preds[n, :, :]
-
-
-        if debug:
-            gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, score_map)
-            if not gt_win or not pred_win:
-                plt.subplot(121)
-                gt_win = plt.imshow(gt_batch_img)
-                plt.subplot(122)
-                pred_win = plt.imshow(pred_batch_img)
-            else:
-                gt_win.set_data(gt_batch_img)
-                pred_win.set_data(pred_batch_img)
-            plt.pause(.05)
-            plt.draw()
-
-        # measure accuracy and record loss
-        losses.update(loss.item(), input.size(0))
-        acces.update(acc[0], input.size(0))
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                    batch=i + 1,
-                    size=len(val_loader),
-                    data=data_time.val,
-                    bt=batch_time.avg,
-                    total=bar.elapsed_td,
-                    eta=bar.eta_td,
-                    loss=losses.avg,
-                    acc=acces.avg
-                    )
-        bar.next()
-
-    bar.finish()
-    return losses.avg, acces.avg, predictions
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
