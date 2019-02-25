@@ -13,7 +13,7 @@ LR=1e-3
 WORKERS=8
 
 
-CHECKPOINT=./checkpoint/${DSET}/${ARCH}-s${STACK}-b${BLOCK}
+CHECKPOINT=./checkpoint/${DSET}/${ARCH}-s${STACK}-b${BLOCK}-batch${TRAINB}-lr${LR}
 
 
 CUDA_VISIBLE_DEVICES=${GPU} python example/main.py \
