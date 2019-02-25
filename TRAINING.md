@@ -98,6 +98,39 @@ CUDA_VISIBLE_DEVICES=0 python ./example/main.py \
 ```
 
 
+- Example 5: Simple baselines model (e.g., resnet50)
+```
+GPU=0
+ARCH=pose_resnet
+DSET=mpii
+FEAT=256
+TRAINB=32
+VALB=24
+LR=1e-3
+WORKERS=8
+RESNETLAYERS=50
+SOLVER=adam
+
+CHECKPOINT=./checkpoint/${DSET}/${ARCH}-${RESNETLAYERS}-${SOLVER}-lr${LR}
+
+CUDA_VISIBLE_DEVICES=${GPU} python example/main.py \
+--arch ${ARCH} \
+--dataset ${DSET} \
+--stack ${STACK} \
+--block ${BLOCK} \
+--features ${FEAT} \
+--checkpoint ${CHECKPOINT} \
+--train-batch ${TRAINB} \
+--test-batch ${VALB} \
+--lr ${LR} \
+--workers ${WORKERS} \
+--resnet-layers ${RESNETLAYERS} \
+--solver ${SOLVER} \
+--epochs 140 \
+--schedule 90 120 \
+--target-weight # original code uses this trick for training pose_resnet
+```
+
 - **Evaluation** from an existing model: use `-e`
 ```
 CUDA_VISIBLE_DEVICES=0 python ./example/main.py \

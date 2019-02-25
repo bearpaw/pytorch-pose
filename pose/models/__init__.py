@@ -1,3 +1,3 @@
 from .hourglass import *
 from .hourglass_gn import *
-from .preresnet import *
+from .pose_resnet import *

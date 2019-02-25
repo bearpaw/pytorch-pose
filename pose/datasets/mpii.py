@@ -112,15 +112,18 @@ class Mpii(data.Dataset):
         # Generate ground truth
         tpts = pts.clone()
         target = torch.zeros(nparts, self.out_res, self.out_res)
+        target_weight = tpts[:, 2].clone().view(nparts, 1)
+
         for i in range(nparts):
             # if tpts[i, 2] > 0: # This is evil!!
             if tpts[i, 1] > 0:
                 tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2]+1, c, s, [self.out_res, self.out_res], rot=r))
-                target[i] = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
+                target[i], vis = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
+                target_weight[i, 0] *= vis
 
         # Meta info
         meta = {'index' : index, 'center' : c, 'scale' : s,
-        'pts' : pts, 'tpts' : tpts}
+        'pts' : pts, 'tpts' : tpts, 'target_weight': target_weight}
 
         return inp, target, meta
 

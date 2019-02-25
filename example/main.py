@@ -20,6 +20,7 @@ from pose.utils.imutils import batch_with_heatmap
 from pose.utils.transforms import fliplr, flip_back
 import pose.models as models
 import pose.datasets as datasets
+import pose.losses as losses
 
 
 # get model names and dataset names
@@ -65,17 +66,27 @@ def main(args):
     print("==> creating model '{}', stacks={}, blocks={}".format(args.arch, args.stacks, args.blocks))
     model = models.__dict__[args.arch](num_stacks=args.stacks,
                                        num_blocks=args.blocks,
-                                       num_classes=njoints)
+                                       num_classes=njoints,
+                                       resnet_layers=args.resnet_layers)
 
     model = torch.nn.DataParallel(model).to(device)
 
     # define loss function (criterion) and optimizer
-    criterion = torch.nn.MSELoss(reduction='mean').to(device)
+    criterion = losses.JointsMSELoss().to(device)
 
-    optimizer = torch.optim.RMSprop(model.parameters(),
-                                    lr=args.lr,
-                                    momentum=args.momentum,
-                                    weight_decay=args.weight_decay)
+    if args.solver == 'rms':
+        optimizer = torch.optim.RMSprop(model.parameters(),
+                                        lr=args.lr,
+                                        momentum=args.momentum,
+                                        weight_decay=args.weight_decay)
+    elif args.solver == 'adam':
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=args.lr,
+        )
+    else:
+        print('Unknown solver: {}'.format(args.solver))
+        assert False
 
     # optionally resume from a checkpoint
     title = args.dataset + ' ' + args.arch
@@ -179,17 +190,17 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
         data_time.update(time.time() - end)
 
         input, target = input.to(device), target.to(device, non_blocking=True)
+        target_weight = meta['target_weight'].to(device, non_blocking=True)
 
         # compute output
         output = model(input)
         if type(output) == list:  # multiple output
-
-            loss = criterion(output[0], target)
-            for j in range(1, len(output)):
-                loss += criterion(output[j], target)
-            output = output[0]
+            loss = 0
+            for o in output:
+                loss += criterion(o, target, target_weight)
+            output = output[-1]
         else:  # single output
-            loss = criterion(output, target)
+            loss = criterion(output, target, target_weight)
         acc = accuracy(output, target, idx)
 
         if debug: # visualize groundtruth and predictions
@@ -253,72 +264,79 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
     gt_win, pred_win = None, None
     end = time.time()
     bar = Bar('Eval ', max=len(val_loader))
-    for i, (input, target, meta) in enumerate(val_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
+    with torch.no_grad():
+        for i, (input, target, meta) in enumerate(val_loader):
+            # measure data loading time
+            data_time.update(time.time() - end)
 
-        input = input.to(device, non_blocking=True)
-        target = target.to(device, non_blocking=True)
+            input = input.to(device, non_blocking=True)
+            target = target.to(device, non_blocking=True)
+            target_weight = meta['target_weight'].to(device, non_blocking=True)
 
-        # compute output
-        output = model(input)
-        score_map = output[-1].cpu() if type(output) == list else output.cpu()
-        if flip:
-            flip_input = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
-            flip_output_var = model(flip_input)
-            flip_output = flip_back(flip_output_var[-1].cpu())
-            score_map += flip_output
-
-
-
-        loss = 0
-        for o in output:
-            loss += criterion(o, target)
-
-        acc = accuracy(score_map, target.cpu(), idx)
-
-        # generate predictions
-        preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
-        for n in range(score_map.size(0)):
-            predictions[meta['index'][n], :, :] = preds[n, :, :]
+            # compute output
+            output = model(input)
+            score_map = output[-1].cpu() if type(output) == list else output.cpu()
+            if flip:
+                flip_input = torch.from_numpy(fliplr(input.clone().numpy())).float().to(device)
+                flip_output = model(flip_input)
+                flip_output = flip_output[-1].cpu() if type(flip_output) == list else flip_output.cpu()
+                flip_output = flip_back(flip_output)
+                score_map += flip_output
 
 
-        if debug:
-            gt_batch_img = batch_with_heatmap(input, target)
-            pred_batch_img = batch_with_heatmap(input, score_map)
-            if not gt_win or not pred_win:
-                plt.subplot(121)
-                gt_win = plt.imshow(gt_batch_img)
-                plt.subplot(122)
-                pred_win = plt.imshow(pred_batch_img)
-            else:
-                gt_win.set_data(gt_batch_img)
-                pred_win.set_data(pred_batch_img)
-            plt.pause(.05)
-            plt.draw()
 
-        # measure accuracy and record loss
-        losses.update(loss.item(), input.size(0))
-        acces.update(acc[0], input.size(0))
+            if type(output) == list:  # multiple output
+                loss = 0
+                for o in output:
+                    loss += criterion(o, target, target_weight)
+                output = output[-1]
+            else:  # single output
+                loss = criterion(output, target, target_weight)
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+            acc = accuracy(score_map, target.cpu(), idx)
 
-        # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                    batch=i + 1,
-                    size=len(val_loader),
-                    data=data_time.val,
-                    bt=batch_time.avg,
-                    total=bar.elapsed_td,
-                    eta=bar.eta_td,
-                    loss=losses.avg,
-                    acc=acces.avg
-                    )
-        bar.next()
+            # generate predictions
+            preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
+            for n in range(score_map.size(0)):
+                predictions[meta['index'][n], :, :] = preds[n, :, :]
 
-    bar.finish()
+
+            if debug:
+                gt_batch_img = batch_with_heatmap(input, target)
+                pred_batch_img = batch_with_heatmap(input, score_map)
+                if not gt_win or not pred_win:
+                    plt.subplot(121)
+                    gt_win = plt.imshow(gt_batch_img)
+                    plt.subplot(122)
+                    pred_win = plt.imshow(pred_batch_img)
+                else:
+                    gt_win.set_data(gt_batch_img)
+                    pred_win.set_data(pred_batch_img)
+                plt.pause(.05)
+                plt.draw()
+
+            # measure accuracy and record loss
+            losses.update(loss.item(), input.size(0))
+            acces.update(acc[0], input.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            # plot progress
+            bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
+                        batch=i + 1,
+                        size=len(val_loader),
+                        data=data_time.val,
+                        bt=batch_time.avg,
+                        total=bar.elapsed_td,
+                        eta=bar.eta_td,
+                        loss=losses.avg,
+                        acc=acces.avg
+                        )
+            bar.next()
+
+        bar.finish()
     return losses.avg, acces.avg, predictions
 
 if __name__ == '__main__':
@@ -346,9 +364,15 @@ if __name__ == '__main__':
                         help='Number of hourglasses to stack')
     parser.add_argument('--features', default=256, type=int, metavar='N',
                         help='Number of features in the hourglass')
+    parser.add_argument('--resnet-layers', default=50, type=int, metavar='N',
+                        help='Number of resnet layers',
+                        choices=[18, 34, 50, 101, 152])
     parser.add_argument('-b', '--blocks', default=1, type=int, metavar='N',
                         help='Number of residual modules at each location in the hourglass')
     # Training strategy
+    parser.add_argument('--solver', metavar='SOLVER', default='rms',
+                        choices=['rms', 'adam'],
+                        help='optimizers')
     parser.add_argument('-j', '--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
     parser.add_argument('--epochs', default=100, type=int, metavar='N',
@@ -369,6 +393,9 @@ if __name__ == '__main__':
                         help='Decrease learning rate at these epochs.')
     parser.add_argument('--gamma', type=float, default=0.1,
                         help='LR is multiplied by gamma on schedule.')
+    parser.add_argument('--target-weight', dest='target_weight',
+                        action='store_true',
+                        help='Loss with target_weight')
     # Data processing
     parser.add_argument('-f', '--flip', dest='flip', action='store_true',
                         help='flip the input during validation')

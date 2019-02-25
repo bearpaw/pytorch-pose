@@ -69,7 +69,7 @@ The results (PCKh@0.5 score) trained using this code is reported in the followin
 | hg_s2_b1 (last)  | 95.80| 94.57    | 88.12 | 83.31 | 86.24| 80.88 | 77.44 | 86.76|
 | hg_s2_b1 (best)  | 95.87| 94.68    | 88.27 | 83.64 | 86.29| 81.20 | 77.70 | 86.95|
 | hg_s8_b1 (last)  | 96.79| 95.19    | 90.08 | 85.32 | 87.48| 84.26 | 80.73 | 88.64|
-| hg_s8_b1 (best)  | 96.79|	95.28	 | 90.27 | 85.56 | 87.57| 84.3  | 81.06	| 88.78|
+| hg_s8_b1 (best)  | 96.79|	95.28	   | 90.27 | 85.56 | 87.57| 84.3  | 81.06	| 88.78|
 
 Training / validation curve is visualized as follows.
 
@@ -96,6 +96,7 @@ Supported dataset
 
 Supported models
 - [x] [Stacked Hourglass networks](https://arxiv.org/abs/1603.06937)
+- [x] Xiao et al., Simple Baselines for Human Pose Estimation and Tracking, ECCV 2018 ([PDF](https://arxiv.org/abs/1804.06208) | [GitHub](https://github.com/Microsoft/human-pose-estimation.pytorch))
 
 ## Contribute
 Please create a pull request if you want to contribute.
