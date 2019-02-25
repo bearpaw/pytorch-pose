@@ -28,12 +28,12 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
    ```
    For training/testing on COCO, please refer to [COCO Readme](https://github.com/bearpaw/pytorch-pose/blob/master/data/mscoco/README.md).
 
-4. Modify your `.bashrc` file:
+<!-- 4. Modify your `.bashrc` file:
    ```
    export PYTHONPATH=".:$PYTHONPATH"
-   ```
+   ``` -->
 
-5. Download annotation file:
+4. Download annotation file:
     * (MPII) Download [mpii_annotations.json](https://drive.google.com/open?id=1mQrH_yVHeB93rzCfyq5kC9ZYTwZeMsMm) and save it to `data/mpii`
     * (MSCOCO) Download [coco_annotations_2014.json](https://drive.google.com/open?id=1jrxis4ujrLlkwoD2GOdv3PGzygpQ04k7) or/and [coco_annotations_2017.json](https://drive.google.com/open?id=1YuzpScAfzemwZqUuZBrbBZdoplXEqUse) and save it to `data/mscoco`
 
