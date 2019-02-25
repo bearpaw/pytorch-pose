@@ -7,7 +7,6 @@ data/mpii/images
 *debug*
 *.idea/*
 test_transforms.py
-experiments
 run
 data/mscoco/coco
 data/mscoco/annotations

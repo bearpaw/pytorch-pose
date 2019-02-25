@@ -24,13 +24,13 @@ class Mscoco(data.Dataset):
         self.rot_factor = kwargs['rot_factor']
         self.label_type = kwargs['label_type']
         self.year       = kwargs['year']
+        self.jsonfile   = kwargs['anno_path']
+        img_folder = kwargs['image_path'] # root image folders
 
         if is_train:
-            self.img_folder = './data/mscoco/images/train{}'.format(self.year)    # root image folders
+            self.img_folder = '{}/train{}'.format(img_folder, self.year)    # root image folders
         else:
-            self.img_folder = './data/mscoco/images/val{}'.format(self.year)    # root image folders
-
-        self.jsonfile   = './data/mscoco/coco_annotations_{}.json'.format(self.year)  # anno file
+            self.img_folder = '{}/val{}'.format(img_folder, self.year)    # root image folders
 
         # create train/val split
         with open(self.jsonfile) as anno_file:
@@ -45,7 +45,7 @@ class Mscoco(data.Dataset):
         self.mean, self.std = self._compute_mean()
 
     def _compute_mean(self):
-        meanstd_file = './data/mscoco/mean.pth.tar'
+        meanstd_file = './data/coco/mean.pth.tar'
         if isfile(meanstd_file):
             meanstd = torch.load(meanstd_file)
         else:
@@ -122,15 +122,18 @@ class Mscoco(data.Dataset):
         # Generate ground truth
         tpts = pts.clone()
         target = torch.zeros(nparts, self.out_res, self.out_res)
+        target_weight = tpts[:, 2].clone().view(nparts, 1)
         for i in range(nparts):
             if tpts[i, 2] > 0: # COCO visible: 0-no label, 1-label + invisible, 2-label + visible
                 tpts[i, 0:2] = to_torch(transform(tpts[i, 0:2]+1, c, s, [self.out_res, self.out_res], rot=r))
-                target[i] = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
+                target[i], vis = draw_labelmap(target[i], tpts[i]-1, self.sigma, type=self.label_type)
+                target_weight[i, 0] = vis
 
         # Meta info
         meta = {'index' : index, 'center' : c,
                 'scale' : s, 'pts' : pts,
-                'tpts' : tpts, 'img_path' : img_path}
+                'tpts' : tpts, 'img_path' : img_path,
+                'target_weight': target_weight}
 
         return inp, target, meta
 

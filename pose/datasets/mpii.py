@@ -16,8 +16,8 @@ from pose.utils.transforms import *
 
 class Mpii(data.Dataset):
     def __init__(self, is_train = True, **kwargs):
-        self.img_folder = './data/mpii/images' # root image folders
-        self.jsonfile   = './data/mpii/mpii_annotations.json'
+        self.img_folder = kwargs['image_path'] # root image folders
+        self.jsonfile   = kwargs['anno_path']
         self.is_train   = is_train # training set or test set
         self.inp_res    = kwargs['inp_res']
         self.out_res    = kwargs['out_res']

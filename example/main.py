@@ -347,6 +347,10 @@ if __name__ == '__main__':
                         help='Datasets: ' +
                             ' | '.join(dataset_names) +
                             ' (default: mpii)')
+    parser.add_argument('--image-path', default='', type=str,
+                        help='path to images')
+    parser.add_argument('--anno-path', default='', type=str,
+                        help='path to annotation (json)')
     parser.add_argument('--year', default=2014, type=int, metavar='N',
                         help='year of coco dataset: 2014 (default) | 2017)')
     parser.add_argument('--inp-res', default=256, type=int,
