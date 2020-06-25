@@ -142,7 +142,7 @@ def crop(img, center, scale, res, rot=0):
             return torch.zeros(res[0], res[1], img.shape[2]) \
                         if len(img.shape) > 2 else torch.zeros(res[0], res[1])
         else:
-             img= cv2.resize(img, dsize=(new_ht,new_wd), interpolation=cv2.INTER_LINEAR)
+             img= cv2.resize(img, dsize=(new_wd,new_ht), interpolation=cv2.INTER_LINEAR)
              print("after resize()",new_ht,new_wd)
              
 #img = imresize(img, [new_ht, new_wd])
@@ -192,7 +192,7 @@ def crop(img, center, scale, res, rot=0):
     if not rot == 0:
         # Remove padding
         #new_img = imrotate(new_img, rot)
-        new_img= imutils.rotate_bound(new_img,rot)
+        new_img= imutils.rotate(new_img,rot) #_bound
         new_img = new_img[pad:-pad, pad:-pad]
 
     new_img = im_to_torch(cv2.resize(new_img, dsize=(res[0],res[1]), interpolation=cv2.INTER_LINEAR))
