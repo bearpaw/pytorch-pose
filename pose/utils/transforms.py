@@ -192,7 +192,9 @@ def crop(img, center, scale, res, rot=0):
     if not rot == 0:
         # Remove padding
         #new_img = imrotate(new_img, rot)
-        new_img= imutils.rotate(new_img,rot) #_bound
+        
+        #new_img= imutils.rotate(new_img,rot) 
+        new_img= imutils.rotate_bound(new_img,-rot) #For bounded rotation
         new_img = new_img[pad:-pad, pad:-pad]
 
     new_img = im_to_torch(cv2.resize(new_img, dsize=(res[0],res[1]), interpolation=cv2.INTER_LINEAR))
