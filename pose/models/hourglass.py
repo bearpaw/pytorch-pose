@@ -145,7 +145,7 @@ class HourglassNet(nn.Module):
         return nn.Sequential(*layers)
 
     def _make_fc(self, inplanes, outplanes):
-        bn = nn.BatchNorm2d(inplanes)
+        bn = nn.BatchNorm2d(outplanes)
         conv = nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=True)
         return nn.Sequential(
                 conv,
