@@ -42,7 +42,7 @@ Some codes for data preparation and augmentation are brought from the [Stacked h
 **Please refer to [TRAINING.md](TRAINING.md) for detailed training recipes!**
 
 ### Testing
-You may download our pretrained models (e.g., [2-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?usp=sharing)) for a quick start.
+You may download our pretrained models (e.g., [2-stack hourglass model](https://drive.google.com/drive/folders/0B63t5HSgY4SQQ2FBRE5rQ2EzbjQ?resourcekey=0-EyrDJs1JYnC5byj5GydbPQ&usp=sharing)) for a quick start.
 
 Run the following command in terminal to evaluate the model on MPII validation split (The train/val split is from [Tompson et al. CVPR 2015](http://www.cims.nyu.edu/~tompson/data/mpii_valid_pred.zip)).
 ```
